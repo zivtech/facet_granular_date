@@ -1,0 +1,20 @@
+<?php
+
+/**
+ * Implements hook_facets_search_api_query_type_mapping_alter.
+ *
+ * Change the date query type to use our Granular class instead of the one
+ * provided by facets.
+ *
+ * TODO - This doesn't work at the moment. It overrides all Date facets to be
+ * granular. We need to make this better. Maybe our own query type? Even if it
+ * is very similar or identical to the existing one?
+ *
+ * @param $backend_plugin_id
+ * @param array $query_types
+ */
+function facet_granular_date_facets_search_api_query_type_mapping_alter($backend_plugin_id, array &$query_types) {
+    if ($backend_plugin_id == 'search_api_solr') {
+        $query_types['date'] = 'search_api_dategranular';
+    }
+}

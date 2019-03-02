@@ -1,0 +1,6 @@
+services:
+  facet_granuar_date.init:
+    class: Drupal\facet_granular_date\EventSubscriber\initSubscriber
+    arguments: []
+    tags:
+      - { name: event_subscriber }
