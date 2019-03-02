@@ -122,8 +122,8 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             // Helper function that processes the conditions for the query
                             // based on the other facet results
                             $this->processConditions($param, $conditions, $query);
-                            // Process issue dates for the facet label and raw value.
-                            $pos = strpos($param, 'issue_date');
+                            // Process the field for the facet label and raw value.
+                            $pos = strpos($param, $field);
                             $pos2 = strpos($param, '-');
                             if ($pos !== false && $pos2 !== false) {
                                 $value = explode(":", $param);
@@ -144,8 +144,8 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                                 $url = clone reset($results)->getUrl();
                             }
                             $options = $url->getOptions();
-                            $options['query']['f'][] = 'issue_date_facet:' . reset($results)->getDisplayValue();
-                            $options['query']['f'][] = 'issue_date_facet:' . $activeItemFirst . '-' . $monthNumber;
+                            $options['query']['f'][] = $field . ':' . reset($results)->getDisplayValue();
+                            $options['query']['f'][] = $field . ':' . $activeItemFirst . '-' . $monthNumber;
                             $url->setOptions($options);
                             $results[$activeItemFirst . '-' . $monthNumber] = new Result($facet, $activeItemFirst . '-' . $monthNumber, $monthName . ' ' . $activeItemFirst, $entities->getResultCount());
                             $results[$activeItemFirst . '-' . $monthNumber]->setUrl($url);
@@ -159,6 +159,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                     $this->unsetAllInactiveFacetResults($results);
                 }
             }
+            //TODO - This whole thing is code duplication. Gross. Fix this.
             if (!empty($activeItemFirst) && !empty($activeItemSecond)) {
                 $activeMonth = $this->getActiveMonth($params);
                 $daysInCurrentMonth = cal_days_in_month(CAL_GREGORIAN, $activeMonth, $activeItemFirst);
@@ -185,9 +186,16 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         // Create the query on the index.
                         // We need to use this index to return the result count for
                         // the newly created facets, since they aren't found automatically.
-                        $query = Index::load('{Site specific index}')->query();
+                        // Get the index ID from the facet. I think this should
+                        // be safe without an !empty check since a facet
+                        // always has to have an Index.
+                        $indexId = $facet->getFacetSource()
+                            ->getIndex()
+                            ->id();
+                        $field = $facet->getFieldIdentifier();
+                        $query = Index::load($indexId)->query();
                         $query->addCondition('status', 1);
-                        $query->addCondition('field_issue_date', [$dayTimestamp, $nextDayTimestamp], 'BETWEEN');
+                        $query->addCondition($field, [$dayTimestamp, $nextDayTimestamp], 'BETWEEN');
                         // Add the extra facet information to get the count data.
                         foreach ($params['f'] as $param) {
                             // Other facets.
@@ -200,26 +208,30 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             // Helper function that processes the conditions for the query
                             // based on the other facet results
                             $this->processConditions($param, $conditions, $query);
-                            // Process issue dates for the facet label and raw value.
-                            $pos = strpos($param, 'issue_date');
+                            // Process the field for the facet label and raw value.
+                            $pos = strpos($param, $field);
                             $pos2 = strpos($param, '-');
                             if ($pos !== false && $pos2 !== false) {
                                 $value = explode(":", $param);
                                 $activeItemCode = $value[1];
                             }
                         }
-                        // Add the body search if the search bar has been filled out.
+                        /*// Add the body search if the search bar has been filled out.
                         if (!empty($params['query'])) {
                             $query->addCondition('body', $params['query'], 'CONTAINS');
-                        }
+                        }*/
                         // Run the query.
                         $entities = $query->execute();
                         if ($entities->getResultCount() > 0) {
-                            $url = clone reset($results)->getUrl();
+                            // TODO - This is temporary data. Make this the request URI.
+                            $url = Url::fromUri('internal://node/1');
+                            if (!empty(reset($results)->getUrl())) {
+                                $url = clone reset($results)->getUrl();
+                            }
                             $options = $url->getOptions();
-                            $options['query']['f'][] = 'issue_date_facet:' . reset($results)->getDisplayValue();
-                            $options['query']['f'][] = 'issue_date_facet:' . $activeItemSecond;
-                            $options['query']['f'][] = 'issue_date_facet:' . $activeItemSecond . '-' . $i;
+                            $options['query']['f'][] = $field . ':' . reset($results)->getDisplayValue();
+                            $options['query']['f'][] = $field . ':' . $activeItemSecond;
+                            $options['query']['f'][] = $field . ':' . $activeItemSecond . '-' . $i;
                             $url->setOptions($options);
                             $displayValue = $day->format('jS') . ' of ' . $month->format('F') . ' ' . $activeItemFirst;
                             $results[$activeItemSecond . '-' . $i] = new Result($facet, $activeItemSecond . '-' . $i, $displayValue, $entities->getResultCount());
@@ -231,8 +243,8 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                     }
                 }
             }
-            kint($results);
         }
+        kint($results);
         return $results;
     }
 
