@@ -99,9 +99,17 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         // about the original site. This is all about getting
                         // the count for each facet. There must be a better
                         // way :/.
-                        $query = Index::load('{site specific index}')->query();
+
+                        // Get the index ID from the facet. I think this should
+                        // be safe without an !empty check since a facet
+                        // always has to have an Index.
+                        $indexId = $facet->getFacetSource()
+                            ->getIndex()
+                            ->id();
+                        $query = Index::load($indexId)->query();
+                        $field = $facet->getFieldIdentifier();
                         $query->addCondition('status', 1);
-                        $query->addCondition('field_issue_date', [$monthTimestamp, $nextMonthTimestamp], 'BETWEEN');
+                        $query->addCondition($field, [$monthTimestamp, $nextMonthTimestamp], 'BETWEEN');
                         // Add the extra facet information to get the count data.
                         foreach ($params['f'] as $param) {
                             // Other facets.
@@ -123,13 +131,18 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             }
                         }
                         // Add the body search if the search bar has been filled out.
-                        if (!empty($params['query'])) {
+                        //TODO. Fix this..
+                        /*if (!empty($params['query'])) {
                             $query->addCondition('body', $params['query'], 'CONTAINS');
-                        }
+                        }*/
                         // Run the query.
                         $entities = $query->execute();
                         if ($entities->getResultCount() > 0) {
-                            $url = clone reset($results)->getUrl();
+                            // TODO - This is temporary data. Make this the request URI.
+                            $url = Url::fromUri('internal://node/1');
+                            if (!empty(reset($results)->getUrl())) {
+                                $url = clone reset($results)->getUrl();
+                            }
                             $options = $url->getOptions();
                             $options['query']['f'][] = 'issue_date_facet:' . reset($results)->getDisplayValue();
                             $options['query']['f'][] = 'issue_date_facet:' . $activeItemFirst . '-' . $monthNumber;
@@ -148,9 +161,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             }
             if (!empty($activeItemFirst) && !empty($activeItemSecond)) {
                 $activeMonth = $this->getActiveMonth($params);
-                kint($activeMonth);
                 $daysInCurrentMonth = cal_days_in_month(CAL_GREGORIAN, $activeMonth, $activeItemFirst);
-                kint([$activeMonth, $daysInCurrentMonth]);
                 // Process months. PHP DateTime months start at 1. So start there.
                 for ($i = 1; $i < $daysInCurrentMonth; $i++) {
 
