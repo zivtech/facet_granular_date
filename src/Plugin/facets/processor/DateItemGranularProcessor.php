@@ -193,6 +193,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             ->getIndex()
                             ->id();
                         $field = $facet->getFieldIdentifier();
+                        $facetId = $facet->id();
                         $query = Index::load($indexId)->query();
                         $query->addCondition('status', 1);
                         $query->addCondition($field, [$dayTimestamp, $nextDayTimestamp], 'BETWEEN');
@@ -209,7 +210,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             // based on the other facet results
                             $this->processConditions($param, $conditions, $query);
                             // Process the field for the facet label and raw value.
-                            $pos = strpos($param, $field);
+                            $pos = strpos($param, $facetId);
                             $pos2 = strpos($param, '-');
                             if ($pos !== false && $pos2 !== false) {
                                 $value = explode(":", $param);
@@ -222,7 +223,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         }*/
                         // Run the query.
                         $entities = $query->execute();
-                        if ($entities->getResultCount() > 0) {
+                        if (!empty($results) && $entities->getResultCount() > 0) {
                             // TODO - This is temporary data. Make this the request URI.
                             $url = Url::fromUri('internal://node/1');
                             if (!empty(reset($results)->getUrl())) {
@@ -236,6 +237,11 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             $displayValue = $day->format('jS') . ' of ' . $month->format('F') . ' ' . $activeItemFirst;
                             $results[$activeItemSecond . '-' . $i] = new Result($facet, $activeItemSecond . '-' . $i, $displayValue, $entities->getResultCount());
                             $results[$activeItemSecond . '-' . $i]->setUrl($url);
+                            if (!empty($activeItemCode) && empty($results[$activeItemCode])) {
+                                //TODO - Fix count here.
+                                $display = \DateTime::createFromFormat('Y-m', $activeItemCode)->format('F Y');
+                                $results[$activeItemCode] = new Result($facet, $activeItemCode, $display, 0);
+                            }
                             if (!empty($activeItemCode) && !empty($results[$activeItemCode])) {
                                 $results[$activeItemCode]->setActiveState(TRUE);
                             }
@@ -244,7 +250,6 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                 }
             }
         }
-        kint($results);
         return $results;
     }
 
