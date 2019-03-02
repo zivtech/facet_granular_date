@@ -14,7 +14,5 @@
  * @param array $query_types
  */
 function facet_granular_date_facets_search_api_query_type_mapping_alter($backend_plugin_id, array &$query_types) {
-    if ($backend_plugin_id == 'search_api_solr') {
-        $query_types['date'] = 'search_api_dategranular';
-    }
+    $query_types['date'] = 'search_api_dategranular';
 }
