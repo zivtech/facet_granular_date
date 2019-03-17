@@ -104,7 +104,14 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
         $granularity = $this->getGranularity();
         $pos = strpos($value, '-');
         if($pos !== false) {
-            $granularity = static::FACETAPI_DATE_MONTH;
+            // TODO swap to switch.
+            if (substr_count($value, '-') == 1) {
+                $granularity = static::FACETAPI_DATE_MONTH;
+            }
+            if (substr_count($value, '-') == 2) {
+                $granularity = static::FACETAPI_DATE_DAY;
+            }
+
         }
 
 

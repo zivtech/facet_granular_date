@@ -84,14 +84,52 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                 $granularity = 'day';
                 // TODO - Should extract this to helper... CreateActiveFacets or so and use it for Year Month & day...
                 // TODO - Get count. Another reason to create a helper...
+                // TODO - UP TO HERE - NEED TO SET A URL FOR EACH FACET.
+                // TODO - /search for Year, /search with Year param intact for Clicking month
+                // TODO - /search with Year and Month param intact for day.
                 $yearDisplay = \DateTime::createFromFormat('Y', $activeItemFirst)->format('Y');
                 $monthDisplay = \DateTime::createFromFormat('Y-m', $activeItemSecond)->format('F Y');
                 $dayDisplay = \DateTime::createFromFormat('Y-m-d', $activeItemThird)->format('jS  \o\f F Y');
                 $results[$activeItemFirst] = new Result($facet, $activeItemFirst, $yearDisplay, 0);
+                $results[$activeItemFirst]->setActiveState(TRUE);
                 $results[$activeItemSecond] = new Result($facet, $activeItemSecond, $monthDisplay, 0);
+                $results[$activeItemSecond]->setActiveState(TRUE);
                 $results[$activeItemThird] = new Result($facet, $activeItemThird, $dayDisplay, 0);
-                $this->createFacets($facet, $params, $activeItem, $granularity, $results);
+                $results[$activeItemThird]->setActiveState(TRUE);
+
+
+                // Create the URLS.
+                // TODO - Extract this to a helper function.
+                // TODO - Replace seach with the request.
+                $field = $facet->getFieldIdentifier();
+                //kint([$activeItemFirst, $activeItemSecond, $activeItemThird]);
+                // Year Facet Url.
+                $url = Url::fromUri('internal://search');
+                //$options = $url->getOptions();
+                //$options['query']['f'][] = $field . ':' . $activeItemFirst;
+                //$options['query']['f'][] = $field . ':' . $activeItems[0] . '-' . $monthNumber;
+                //$url->setOptions($options);
+                $results[$activeItemFirst]->setUrl($url);
+                // Month facet Url
+                $monthUrl = Url::fromUri('internal://search');
+                //$monthOptions = $monthUrl->getOptions();
+                $monthOptions['query']['f'][0] = $field . ':' . $activeItemFirst;
+                //$monthOptions['query']['f'][] = $field . ':' . $activeItems[0] . '-' . $monthNumber;
+                $monthUrl->setOptions($monthOptions);
+                $results[$activeItemSecond]->setUrl($monthUrl);
+                // Day facet URL.
+                $dayUrl = Url::fromUri('internal://search');
+                //$dayOptions = $dayUrl->getOptions();
+                $dayOptions['query']['f'][0] = $field . ':' . $activeItemFirst;
+                $dayOptions['query']['f'][1] = $field . ':' . $activeItemSecond;
+                $dayUrl->setOptions($dayOptions);
+                $results[$activeItemThird]->setUrl($dayUrl);
+                //$this->createFacets($facet, $params, $activeItem, $granularity, $results);
             }
+        }
+        //kint ($results);
+        foreach ($results as $result) {
+            kint($result->getUrl());
         }
         return $results;
     }
@@ -327,11 +365,13 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                                         $options = $url->getOptions();
                                         $options['query']['f'][] = $field . ':' . reset($results)->getDisplayValue();
                                         $options['query']['f'][] = $field . ':' . $activeItems[1];
-                                        $options['query']['f'][] = $field . ':' . $activeItems[1] . '-' . $i;
+                                        //kint('day' . $day->format('d'));
+                                        $options['query']['f'][] = $field . ':' . $activeItems[1] . '-' . $day->format('d');
+                                        //$options['query']['f'][] = $field . ':' . $activeItems[1] . '-' . $i;
                                         $url->setOptions($options);
                                         $displayValue = $day->format('jS') . ' of ' . $month->format('F') . ' ' . $activeItems[0];
-                                        $results[$activeItems[1] . '-' . $i] = new Result($facet, $activeItems[1] . '-' . $i, $displayValue, $dayEntities->getResultCount());
-                                        $results[$activeItems[1] . '-' . $i]->setUrl($url);
+                                        $results[$activeItems[1] . '-' . $day->format('d')] = new Result($facet, $activeItems[1] . '-' . $day->format('d'), $displayValue, $dayEntities->getResultCount());
+                                        $results[$activeItems[1] . '-' . $day->format('d')]->setUrl($url);
                                     }
                                 }
                             }
@@ -345,8 +385,6 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             }
                             break;
                         case 'day':
-                            kint('here');
-                            kint($results);
                             break;
 
                     }
