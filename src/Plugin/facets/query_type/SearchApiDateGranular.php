@@ -70,7 +70,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
         $configuration['date_display'] = $dateProcessorConfig['date_display'];
         $configuration['date_format'] = $dateProcessorConfig['date_format'];
         $this->setConfiguration($configuration);
-        //kint(get_defined_vars());
     }
 
     /**
@@ -104,6 +103,7 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
         $granularity = $this->getGranularity();
         $pos = strpos($value, '-');
         if($pos !== false) {
+            kint (substr_count($value, '-'));
             // TODO swap to switch.
             if (substr_count($value, '-') == 1) {
                 $granularity = static::FACETAPI_DATE_MONTH;
@@ -111,9 +111,7 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
             if (substr_count($value, '-') == 2) {
                 $granularity = static::FACETAPI_DATE_DAY;
             }
-
         }
-
 
         $dateTime = new DrupalDateTime();
 
@@ -148,7 +146,7 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
                 $stopDate = $dateTime::createFromFormat('Y-m-d\TH:i:s', $value);
                 break;
         }
-
+        kint([$startDate->format('d-m-Y'), $stopDate->format('d-m-Y')]);
         return [
             'start' => $startDate->format('U'),
             'stop' => $stopDate->format('U'),
@@ -171,6 +169,7 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      *   Thrown when creating a date fails.
      */
     protected function calculateRangeRelative($value) {
+        //die();
         $dateTime = new DrupalDateTime();
 
         switch ($this->getGranularity()) {
@@ -245,6 +244,7 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      */
     public function calculateResultFilterAbsolute($value) {
         //die('hereResultFilterAb');
+        // TODO maybe this is broken..?
         // TODO - Code gets here
         $date = new DrupalDateTime();
         $date->setTimestamp($value);
@@ -436,7 +436,7 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      *   The granularity for this config.
      */
     protected function getGranularity() {
-        return static::FACETAPI_DATE_YEAR;
+        return $this->getConfiguration()['granularity'];
     }
 
     /**

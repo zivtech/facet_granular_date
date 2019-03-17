@@ -35,7 +35,7 @@ use Drupal\Core\Url;
  *   label = @Translation("Date item granular processor"),
  *   description = @Translation("Year -> Year-month granularity."),
  *   stages = {
- *     "build" = 1
+ *     "build" = 35
  *   }
  * )
  */
@@ -51,6 +51,11 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
      */
     public function build(FacetInterface $facet, array $results) {
 
+
+        kint($facet);
+        // TODO - Up to here. Facet has lost it's bloody active items when clicking month.. Why?
+        // The month isn't getting the active state when it's year month!! Why?
+        // consequences.
         // We only want this to run if the year as already been selected.
         // Otherwise dob't alter the results.
         if(!empty($facet->getActiveItems())) {
@@ -78,10 +83,17 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             // TODO - This could be nicer probably....
             if (!empty($activeItemFirst) && !empty($activeItemSecond) && empty($activeItemThird)) {
                 $granularity = 'month';
+                $config = $this->getConfiguration();
+                $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_MONTH;
+                $this->setConfiguration($config);
                 $this->createFacets($facet, $params, $activeItem, $granularity, $results);
             }
             if (!empty($activeItemFirst) && !empty($activeItemSecond) && !empty($activeItemThird)) {
                 $granularity = 'day';
+                //kint($this);
+                $config = $this->getConfiguration();
+                $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_DAY;
+                $this->setConfiguration($config);
                 // TODO - Should extract this to helper... CreateActiveFacets or so and use it for Year Month & day...
                 // TODO - Get count. Another reason to create a helper...
                 // TODO - UP TO HERE - NEED TO SET A URL FOR EACH FACET.
@@ -127,10 +139,8 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                 //$this->createFacets($facet, $params, $activeItem, $granularity, $results);
             }
         }
-        //kint ($results);
-        foreach ($results as $result) {
-            kint($result->getUrl());
-        }
+        //$results['2016']->setActiveState(FALSE);
+        kint ($results);
         return $results;
     }
 
@@ -375,6 +385,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                                     }
                                 }
                             }
+                            $activeItemCode = $activeItems[1];
                             if (!empty($activeItemCode) && empty($results[$activeItemCode])) {
                                 //TODO - Fix count here.
                                 $display = \DateTime::createFromFormat('Y-m', $activeItemCode)->format('F Y');
