@@ -127,34 +127,13 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                 $filter_params[] = $filter_string;
                 $facetProcessors = $facet->getProcessors();
                 if (isset($facetProcessors['date_granular_item'])) {
-                    $yearCount = 0;
-                    $yearKey = 0;
-                    $monthCount = 0;
-                    $monthKey = 0;
-                    $dayCount = 0;
-                    foreach ($results as $key => $granular_result) {
-                        // Find granularity based on Hyphons and remove the active year and month.
-                        // TODO - May need to make this a helper..?
-                        $hyphonCount = substr_count($key, '-');
-                        switch ($hyphonCount) {
-                            case 0:
-                                $yearKey = $key;
-                                $yearCount++;
-                                break;
-                            case 1:
-                                $monthCount++;
-                                $monthKey = $key;
-                                break;
-                            case 2:
-                                $dayCount++;
-                        }
-                    }
-                    if ($yearCount == 1 && sizeof($results) > 1) {
+                    $dateKeys = $this->processDateKeysAndCount($results);
+                    if ($dateKeys['yearcount'] == 1 && sizeof($results) > 1) {
                         // [0] seems to be good enough here - could review if $field : $yearKey could be
                         // the better way to do it.
                         unset($filter_params[0]);
                     }
-                    if ($monthCount == 1 && sizeof($results) > 1) {
+                    if ($dateKeys['monthcount'] == 1 && sizeof($results) > 1) {
                         // [0] seems to be good enough here - could review if $field : $monthKey could be
                         // the better way to do it.
                         unset($filter_params[0]);
@@ -211,33 +190,10 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
         // Click day : Take you back to month.
         $facetProcessors = $facet->getProcessors();
         if (isset($facetProcessors['date_granular_item'])) {
-            $yearCount = 0;
-            $yearKey = 0;
-            $monthCount = 0;
-            $monthKey = 0;
-            $dayCount = 0;
-            $dayKey = 0;
-            foreach ($results as $key => &$result) {
-                // Find granularity based on Hyphons and remove the active year and month.
-                // TODO - May need to make this a helper..?
-                $hyphonCount = substr_count($key, '-');
-                switch ($hyphonCount) {
-                    case 0:
-                        $yearKey = $key;
-                        $yearCount++;
-                        break;
-                    case 1:
-                        $monthCount++;
-                        $monthKey = $key;
-                        break;
-                    case 2:
-                        $dayCount++;
-                        $dayKey = $key;
-                }
-            }
+            $dateKeys = $this->processDateKeysAndCount($results);
             // TODO - Clean this up.
-            if ($yearCount == 1 && sizeof($results) > 1) {
-                $url = $results[$yearKey]->getUrl();
+            if ($dateKeys['yearCount'] == 1 && sizeof($results) > 1) {
+                $url = $results[$dateKeys['yearkey']]->getUrl();
                 $options = $url->getOptions();
                 foreach ($options['query']['f'] as $key => $option) {
                     //TODO -  Get field here properly.
@@ -247,11 +203,11 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                     }
                 }
                 $url->setOptions($options);
-                $results[$yearKey]->setUrl($url);
+                $results[$dateKeys['yearkey']]->setUrl($url);
 
             }
-            if ($monthCount === 1 && sizeof($results) > 1) {
-                $url = $results[$monthKey]->getUrl();
+            if ($dateKeys['monthcount'] === 1 && sizeof($results) > 1) {
+                $url = $results[$dateKeys['monthkey']]->getUrl();
                 $options = $url->getOptions();
                 foreach ($options['query']['f'] as $key => $option) {
                     //TODO -  Get field here properly.
@@ -261,12 +217,12 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                     }
                 }
                 // TODO - Get field properly.
-                $options['query']['f'][] = 'issue_date:' . $yearKey;
+                $options['query']['f'][] = 'issue_date:' . $dateKeys['yearkey'];
                 $url->setOptions($options);
-                $results[$monthKey]->setUrl($url);
+                $results[$dateKeys['monthkey']]->setUrl($url);
             }
-            if ($dayCount === 1 && sizeof($results) > 1) {
-                $url = $results[$dayKey]->getUrl();
+            if ($dateKeys['daycount'] === 1 && sizeof($results) > 1) {
+                $url = $results[$dateKeys['daykey']]->getUrl();
                 $options = $url->getOptions();
                 foreach ($options['query']['f'] as $key => $option) {
                     //TODO -  Get field here properly.
@@ -276,7 +232,7 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                     }
                 }
                 // TODO - Get field properly.
-                $options['query']['f'][] = 'issue_date:' . $monthKey;
+                $options['query']['f'][] = 'issue_date:' . $dateKeys['monthkey'];
                 $url->setOptions($options);
                 $results[$monthKey]->setUrl($url);
             }
@@ -374,6 +330,41 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
             $mapping[$facet_source_id][$facet_id] = $facet->getUrlAlias();
         }
         return $mapping[$facet_source_id][$facet_id];
+    }
+
+    private function processDateKeysAndCount($results) {
+        $yearCount = 0;
+        $yearKey = 0;
+        $monthCount = 0;
+        $monthKey = 0;
+        $dayCount = 0;
+        $dayKey = 0;
+        foreach ($results as $key => $granular_result) {
+            // Find granularity based on Hyphons and remove the active year and month.
+            // TODO - May need to make this a helper..?
+            $hyphonCount = substr_count($key, '-');
+            switch ($hyphonCount) {
+                case 0:
+                    $yearKey = $key;
+                    $yearCount++;
+                    break;
+                case 1:
+                    $monthCount++;
+                    $monthKey = $key;
+                    break;
+                case 2:
+                    $dayCount++;
+                    $dayKey = $key;
+            }
+        }
+        return [
+            'yearcount'   => $yearCount,
+            'yearkey'     => $yearKey,
+            'monthcount'  => $monthCount,
+            'monthkey'    => $monthKey,
+            'daycount'    => $dayCount,
+            'daykey'      => $dayKey,
+        ];
     }
 
 }
