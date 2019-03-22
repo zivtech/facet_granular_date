@@ -18,6 +18,7 @@ use Drupal\facets\QueryType\QueryTypeRangeBase;
  *
  * TODO - this is *mostly* a copy of the default date query type.
  *   needs a good review.
+ * TODO - Maybe it could extend the existing SearchApiDate class?
  *
  * @FacetsQueryType(
  *   id = "search_api_dategranular",
@@ -103,7 +104,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
         $granularity = $this->getGranularity();
         $pos = strpos($value, '-');
         if($pos !== false) {
-            kint (substr_count($value, '-'));
             // TODO swap to switch.
             if (substr_count($value, '-') == 1) {
                 $granularity = static::FACETAPI_DATE_MONTH;
@@ -146,7 +146,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
                 $stopDate = $dateTime::createFromFormat('Y-m-d\TH:i:s', $value);
                 break;
         }
-        kint([$startDate->format('d-m-Y'), $stopDate->format('d-m-Y')]);
         return [
             'start' => $startDate->format('U'),
             'stop' => $stopDate->format('U'),
