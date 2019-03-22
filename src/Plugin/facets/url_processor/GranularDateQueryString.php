@@ -189,15 +189,16 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
         // Click month : Take you back to year
         // Click day : Take you back to month.
         $facetProcessors = $facet->getProcessors();
+        $field = $facet->getFieldIdentifier();
         if (isset($facetProcessors['date_granular_item'])) {
             $dateKeys = $this->processDateKeysAndCount($results);
-            // TODO - Clean this up.
-            if ($dateKeys['yearCount'] == 1 && sizeof($results) > 1) {
+            // Review - Clean this up as part of code review.
+            if ($dateKeys['yearcount'] == 1 && sizeof($results) > 1) {
                 $url = $results[$dateKeys['yearkey']]->getUrl();
                 $options = $url->getOptions();
                 foreach ($options['query']['f'] as $key => $option) {
                     //TODO -  Get field here properly.
-                    $pos = strpos($option, 'issue_date');
+                    $pos = strpos($option, $field);
                     if ($pos !== false) {
                         unset($options['query']['f'][$key]);
                     }
@@ -210,14 +211,12 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                 $url = $results[$dateKeys['monthkey']]->getUrl();
                 $options = $url->getOptions();
                 foreach ($options['query']['f'] as $key => $option) {
-                    //TODO -  Get field here properly.
                     $pos = strpos($option, 'issue_date');
                     if ($pos !== false) {
                         unset($options['query']['f'][$key]);
                     }
                 }
-                // TODO - Get field properly.
-                $options['query']['f'][] = 'issue_date:' . $dateKeys['yearkey'];
+                $options['query']['f'][] = $field . $dateKeys['yearkey'];
                 $url->setOptions($options);
                 $results[$dateKeys['monthkey']]->setUrl($url);
             }
@@ -225,16 +224,14 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                 $url = $results[$dateKeys['daykey']]->getUrl();
                 $options = $url->getOptions();
                 foreach ($options['query']['f'] as $key => $option) {
-                    //TODO -  Get field here properly.
-                    $pos = strpos($option, 'issue_date');
+                    $pos = strpos($option, $field);
                     if ($pos !== false) {
                         unset($options['query']['f'][$key]);
                     }
                 }
-                // TODO - Get field properly.
-                $options['query']['f'][] = 'issue_date:' . $dateKeys['monthkey'];
+                $options['query']['f'][] = $field . $dateKeys['monthkey'];
                 $url->setOptions($options);
-                $results[$monthKey]->setUrl($url);
+                $results[$dateKeys['monthkey']]->setUrl($url);
             }
         }
         // Restore page parameter again. See https://www.drupal.org/node/2726455.
