@@ -16,9 +16,7 @@ use Drupal\facets\QueryType\QueryTypeRangeBase;
  * implement dates, you can alter the ::getQueryTypesForDataType method on the
  * backendPlugin to return a different class.
  *
- * TODO - this is *mostly* a copy of the default date query type.
- *   needs a good review.
- * TODO - Maybe it could extend the existing SearchApiDate class?
+ * To review - Maybe it could extend the existing SearchApiDate class?
  *
  * @FacetsQueryType(
  *   id = "search_api_dategranular",
@@ -168,7 +166,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      *   Thrown when creating a date fails.
      */
     protected function calculateRangeRelative($value) {
-        //die();
         $dateTime = new DrupalDateTime();
 
         switch ($this->getGranularity()) {
@@ -229,7 +226,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      *   An array with a start and end date as unix timestamps.
      */
     public function calculateResultFilter($value) {
-        //die('hereResultFilter');
         if ($this->getDateDisplay() === 'relative_date') {
             return $this->calculateResultFilterRelative($value);
         }
@@ -242,9 +238,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      * {@inheritdoc}
      */
     public function calculateResultFilterAbsolute($value) {
-        //die('hereResultFilterAb');
-        // TODO maybe this is broken..?
-        // TODO - Code gets here
         $date = new DrupalDateTime();
         $date->setTimestamp($value);
         $date_format = $this->getDateFormat();

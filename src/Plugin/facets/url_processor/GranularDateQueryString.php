@@ -11,6 +11,8 @@ use Symfony\Component\HttpFoundation\Request;
 /**
  * Query string URL processor.
  *
+ * For later review - I wonder if it would be better to extend the existing facets plugin. Probably makes more sense.
+ *
  * @FacetsUrlProcessor(
  *   id = "granular_date_query_string",
  *   label = @Translation("Granular date Query string"),
@@ -19,7 +21,6 @@ use Symfony\Component\HttpFoundation\Request;
  */
 class GranularDateQueryString extends UrlProcessorPluginBase {
 
-    //TODO - I wonder if it would be better to extend the existing facets plugin. Probably makes more sense.
     /**
      * A string of how to represent the facet in the url.
      *
@@ -149,13 +150,13 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                         }
                     }
                     if ($yearCount == 1 && sizeof($results) > 1) {
-                        // TODO - Is [0] good enough here? Maybe $field . ':' . $yearKey would be better?
+                        // [0] seems to be good enough here - could review if $field : $yearKey could be
+                        // the better way to do it.
                         unset($filter_params[0]);
-                        //$results[$key]->setActiveState(FALSE);
                     }
                     if ($monthCount == 1 && sizeof($results) > 1) {
-                        //TODO - Up to here? Need to kint this and see why it's not working.
-                        // TODO - Is [0] good enough here? Maybe $field . ':' . $yearKey would be better?
+                        // [0] seems to be good enough here - could review if $field : $monthKey could be
+                        // the better way to do it.
                         unset($filter_params[0]);
                     }
                 }
@@ -202,11 +203,12 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
             }
             $result->setUrl($url);
         }
-        // TODO - Up to here - Set the correct click off URLS. As the following rules
+        // For review - Could fold the below into the above foreach - For now it's ok here,
+        // performance wise it would make sense not to loop through all twice.. What happens if you have 20,000 nodes?
+        // Set the new URL patterns as the follows:
         // Click year : Take you back to search
         // Click month : Take you back to year
         // Click day : Take you back to month.
-        // TODO when finished - Fold this back into the above foreach. No reason for it to be seperate.
         $facetProcessors = $facet->getProcessors();
         if (isset($facetProcessors['date_granular_item'])) {
             $yearCount = 0;
@@ -258,7 +260,7 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                         unset($options['query']['f'][$key]);
                     }
                 }
-                // TODO - Up to here - Duplicates..? Day isn't formatted correctly.
+                // TODO - Get field properly.
                 $options['query']['f'][] = 'issue_date:' . $yearKey;
                 $url->setOptions($options);
                 $results[$monthKey]->setUrl($url);
@@ -273,7 +275,6 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                         unset($options['query']['f'][$key]);
                     }
                 }
-                // TODO - Up to here - Duplicates..? Day isn't formatted correctly.
                 // TODO - Get field properly.
                 $options['query']['f'][] = 'issue_date:' . $monthKey;
                 $url->setOptions($options);

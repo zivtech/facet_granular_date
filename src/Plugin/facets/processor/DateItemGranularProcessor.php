@@ -6,29 +6,13 @@ use Drupal\facets\FacetInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\facets\Processor\BuildProcessorInterface;
 use Drupal\facets\Processor\ProcessorPluginBase;
-//use Drupal\facets\Plugin\facets\query_type\SearchApiDate;
 use Drupal\facet_granular_date\Plugin\facets\query_type\SearchApiDateGranular;
 use Drupal\search_api\Entity\Index;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\Core\TypedData\ComplexDataDefinitionInterface;
-use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
-use Drupal\Core\TypedData\TranslatableInterface;
-use Drupal\facets\Exception\InvalidProcessorException;
 use Drupal\facets\Result\Result;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Url;
 
 /**
- * Provides a processor for dates.
- *
- * TODO - This whole class needs review. It might be mostly experimental
- *  and/or pointless.
- *
- * TODO - Gross. On review I forgot how far away from me this code got.
- *   There is a whole bunch of code duplication and grossness. Lots to
- *   do in this class.
+ * Provides a processor for granular dates.
  *
  * @FacetsProcessor(
  *   id = "date_granular_item",
@@ -65,7 +49,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             $facetActiveItems = $facet->getActiveItems();
             $activeItem = array_pop($facetActiveItems);
             $hyphonCount = substr_count($activeItem, '-');
-            // Change to switch
+            // TODO - Change to switch
             if ($hyphonCount == 0) {
                 $granularity = 'year';
                 //TODO - Fix count here.
@@ -122,40 +106,12 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
 
 
 
+                // TODO is this needed?
                 $config = $this->getConfiguration();
                 $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_DAY;
                 $this->setConfiguration($config);
-
-                // Create the URLS.
-                // TODO - Extract this to a helper function.
-                // TODO - Replace seach with the request.
-                $field = $facet->getFieldIdentifier();
-                //kint([$activeItemFirst, $activeItemSecond, $activeItemThird]);
-                // Year Facet Url.
-                /*$url = Url::fromUri('internal://search');
-                //$options = $url->getOptions();
-                //$options['query']['f'][] = $field . ':' . $activeItemFirst;
-                //$options['query']['f'][] = $field . ':' . $activeItems[0] . '-' . $monthNumber;
-                //$url->setOptions($options);
-                $results[$activeItemFirst]->setUrl($url);
-                // Month facet Url
-                $monthUrl = Url::fromUri('internal://search');
-                //$monthOptions = $monthUrl->getOptions();
-                $monthOptions['query']['f'][0] = $field . ':' . $activeItemFirst;
-                //$monthOptions['query']['f'][] = $field . ':' . $activeItems[0] . '-' . $monthNumber;
-                $monthUrl->setOptions($monthOptions);
-                $results[$activeItemSecond]->setUrl($monthUrl);
-                // Day facet URL.
-                $dayUrl = Url::fromUri('internal://search');
-                //$dayOptions = $dayUrl->getOptions();
-                $dayOptions['query']['f'][0] = $field . ':' . $activeItemFirst;
-                $dayOptions['query']['f'][1] = $field . ':' . $activeItemSecond;
-                $dayUrl->setOptions($dayOptions);
-                $results[$activeItemThird]->setUrl($dayUrl);*/
-                //$this->createFacets($facet, $params, $activeItem, $granularity, $results);
             }
         }
-        kint($results);
         return $results;
     }
 
@@ -228,14 +184,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
         }
     }
 
-    private function createFacets($facet, $params, $activeItems, $granularity, &$results)
-    {
-        //if (!empty($activeItemFirst)) {
-        // TODO - Shouldn't this be in the year switch..?
-        // Process months. PHP DateTime months start at 1. So start there.
-        // TODO - Testing line here.
-        //$activeItems[0] = '2016';
-        // Need a hyhonCount check here..? TODO
+    private function createFacets($facet, $params, $activeItems, $granularity, &$results) {
         switch ($granularity) {
             case 'year':
                 for ($i = 1; $i < 13; $i++) {
@@ -290,19 +239,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             // Helper function that processes the conditions for the query
                             // based on the other facet results
                             $this->processConditions($param, $conditions, $query);
-                            // Process the field for the facet label and raw value.
-                            $pos = strpos($param, $field);
-                            $pos2 = strpos($param, '-');
-                            if ($pos !== false && $pos2 !== false) {
-                                $value = explode(":", $param);
-                                $activeItemCode = $value[1];
-                            }
                         }
-                        // Add the body search if the search bar has been filled out.
-                        //TODO. Fix this..
-                        /*if (!empty($params['query'])) {
-                            $query->addCondition('body', $params['query'], 'CONTAINS');
-                        }*/
                         // Run the query.
                         $entities = $query->execute();
                         if (!empty($results) && $entities->getResultCount() > 0) {
@@ -318,9 +255,6 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             $url->setOptions($options);
                             $results[$activeItems . '-' . $monthNumber] = new Result($facet, $activeItems . '-' . $monthNumber, $monthName . ' ' . $activeItems, $entities->getResultCount());
                             $results[$activeItems . '-' . $monthNumber]->setUrl($url);
-                            /*if (!empty($activeItemCode) && !empty($results[$activeItemCode])) {
-                                $results[$activeItemCode]->setActiveState(TRUE);
-                            }*/
                         }
                     }
                 }
@@ -331,10 +265,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                 $explodedActiveItem = explode('-', $activeItems);
                 $yearValue = $explodedActiveItem[0];
                 $daysInCurrentMonth = cal_days_in_month(CAL_GREGORIAN, $activeMonth, $yearValue);
-                //$results[$activeItems[1]] = new Result($facet, $activeItems[1], $monthName . ' ' . $activeItems[0], $entities->getResultCount());
                 // Process days. PHP DateTime days start at 1. So start there.
-                //TODO - Here are the days.. What do we do about it? Need to move some of the facet create code below into this..
-                // TODO - Need to show the active month...
                 for ($i = 1; $i < $daysInCurrentMonth; $i++) {
                     $day = \DateTime::createFromFormat('j', $i);
                     $month = \DateTime::createFromFormat('m', $activeMonth);
@@ -371,46 +302,15 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                             // Helper function that processes the conditions for the query
                             // based on the other facet results
                             $this->processConditions($param, $conditions, $dayQuery);
-                            // Process the field for the facet label and raw value.
-                            $pos = strpos($param, $dayField);
-                            $pos2 = strpos($param, '-');
-                            if ($pos !== false && $pos2 !== false) {
-                                $dayValue = explode(":", $param);
-                                $activeItemCode = $dayValue[1];
-                            }
                         }
-                        // Add the body search if the search bar has been filled out.
-                        //TODO. Fix this..
-                        /*if (!empty($params['query'])) {
-                            $query->addCondition('body', $params['query'], 'CONTAINS');
-                        }*/
                         // Run the query.
                         $dayEntities = $dayQuery->execute();
 
                         if ($dayEntities->getResultCount() > 0) {
-
-
-                            // Get the month in the n format (month number, without leading 0).
-                            $dayObj = \DateTime::createFromFormat('n', $i);
-                            // Human readable month.
-                            $dayName = $dayObj->format('F');
-                            // Month with leading 0.
-                            $dayNumber = $dayObj->format('m');
-                            // TODO - Fix this, Day needs to be put back from the git diff.
-
-                            // TODO - Is this URL stuff needed?
-//                            $options = $url->getOptions();
-//                            $options['query']['f'][] = $field . ':' . reset($results)->getDisplayValue();
-//                            $options['query']['f'][] = $field . ':' . $activeItems;
-//                            //kint('day' . $day->format('d'));
-//                            $options['query']['f'][] = $field . ':' . $activeItems . '-' . $day->format('d');
-//                            //$options['query']['f'][] = $field . ':' . $activeItems . '-' . $i;
-//                            $url->setOptions($options);
                             $explodedActiveItem = explode('-', $activeItems);
                             $yearValue = $explodedActiveItem[0];
                             $displayValue = $day->format('jS') . ' of ' . $month->format('F') . ' ' . $yearValue;
                             $results[$activeItems . '-' . $day->format('d')] = new Result($facet, $activeItems . '-' . $day->format('d'), $displayValue, $dayEntities->getResultCount());
-                            //$results[$activeItems . '-' . $day->format('d')]->setUrl($url);
                         }
                     }
                 }
