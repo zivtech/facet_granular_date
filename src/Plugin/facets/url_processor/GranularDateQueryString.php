@@ -189,7 +189,7 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
         // Click month : Take you back to year
         // Click day : Take you back to month.
         $facetProcessors = $facet->getProcessors();
-        $field = $facet->getFieldIdentifier();
+        $field = $this->getUrlAliasByFacetId($facet->id(), $facet->getFacetSourceId());
         if (isset($facetProcessors['date_granular_item'])) {
             $dateKeys = $this->processDateKeysAndCount($results);
             // Review - Clean this up as part of code review.
@@ -197,7 +197,6 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                 $url = $results[$dateKeys['yearkey']]->getUrl();
                 $options = $url->getOptions();
                 foreach ($options['query']['f'] as $key => $option) {
-                    //TODO -  Get field here properly.
                     $pos = strpos($option, $field);
                     if ($pos !== false) {
                         unset($options['query']['f'][$key]);
@@ -216,7 +215,7 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                         unset($options['query']['f'][$key]);
                     }
                 }
-                $options['query']['f'][] = $field . $dateKeys['yearkey'];
+                $options['query']['f'][] = $field . ':' . $dateKeys['yearkey'];
                 $url->setOptions($options);
                 $results[$dateKeys['monthkey']]->setUrl($url);
             }
@@ -229,7 +228,7 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                         unset($options['query']['f'][$key]);
                     }
                 }
-                $options['query']['f'][] = $field . $dateKeys['monthkey'];
+                $options['query']['f'][] = $field . ':' .  $dateKeys['monthkey'];
                 $url->setOptions($options);
                 $results[$dateKeys['monthkey']]->setUrl($url);
             }
@@ -337,8 +336,7 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
         $dayCount = 0;
         $dayKey = 0;
         foreach ($results as $key => $granular_result) {
-            // Find granularity based on Hyphons and remove the active year and month.
-            // TODO - May need to make this a helper..?
+            // Find granularity based on Hyphons and log them for use later.
             $hyphonCount = substr_count($key, '-');
             switch ($hyphonCount) {
                 case 0:

@@ -50,66 +50,63 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             $activeItem = array_pop($facetActiveItems);
             $hyphonCount = substr_count($activeItem, '-');
             // TODO - Change to switch
-            if ($hyphonCount == 0) {
-                $granularity = 'year';
-                //TODO - Fix count here.
-                // Create Year facet.
-                $results[$activeItem] = new Result($facet, $activeItem, $activeItem, 0);
-                $this->createFacets($facet, $params, $activeItem, $granularity, $results);
-                if ($this->checkDateFacetsCount($params) > 1) {
-                    $this->unsetAllInactiveFacetResults($results);
-                }
-                $config = $this->getConfiguration();
-                $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_YEAR;
-                $this->setConfiguration($config);
-            }
-            // TODO - This could be nicer probably....
-            // TODO change to switch
+            switch($hyphonCount) {
+                case 0:
+                    $granularity = 'year';
+                    //TODO - Fix count here.
+                    // Create Year facet.
+                    $results[$activeItem] = new Result($facet, $activeItem, $activeItem, 0);
+                    $this->createFacets($facet, $params, $activeItem, $granularity, $results);
+                    if ($this->checkDateFacetsCount($params) > 1) {
+                        $this->unsetAllInactiveFacetResults($results);
+                    }
+                    $config = $this->getConfiguration();
+                    $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_YEAR;
+                    $this->setConfiguration($config);
+                    break;
+                case 1:
+                    // TODO - Create the exploded one here.
+                    $granularity = 'month';
+                    $explodedActiveItem = explode('-', $activeItem);
+                    $yearValue = $explodedActiveItem[0];
+                    //TODO - Fix count here.
+                    // Create Year facet.
+                    $results[$yearValue] = new Result($facet, $yearValue, $yearValue, 0);
+                    $results[$yearValue]->setActiveState(TRUE);
+                    //TODO - Fix count
+                    // Create month facet.
+                    $monthDisplay = \DateTime::createFromFormat('Y-m', $activeItem)->format('F Y');
+                    $results[$activeItem] = new Result($facet, $activeItem, $monthDisplay, 0);
+                    $results[$activeItem]->setActiveState(TRUE);
+                    $this->createFacets($facet, $params, $activeItem, $granularity, $results);
+                    break;
+                case 2:
+                    $granularity = 'day';
+                    // TODO - Need helper for this.
+                    $explodedActiveItem = explode('-', $activeItem);
+                    $yearValue = $explodedActiveItem[0];
+                    $monthValue = $explodedActiveItem[1];
+                    // TODO - Should extract this to helper... CreateActiveFacets or so and use it for Year Month & day...
+                    // TODO - Get count. Another reason to create a helper...
+                    // Create Year facet.
+                    $results[$yearValue] = new Result($facet, $yearValue, $yearValue, 0);
+                    $results[$yearValue]->setActiveState(TRUE);
+                    //TODO - Fix count
+                    // Create month facet.
+                    $monthDisplay = \DateTime::createFromFormat('Y-m', $yearValue . '-' . $monthValue)->format('F Y');
+                    $results[$yearValue . '-' . $monthValue] = new Result($facet, $yearValue . '-' . $monthValue, $monthDisplay, 0);
+                    $results[$yearValue . '-' . $monthValue]->setActiveState(TRUE);
+                    // Create day facet.
+                    // TODO fix count.
+                    $dayDisplay = \DateTime::createFromFormat('Y-m-d', $activeItem)->format('jS  \o\f F Y');
+                    $results[$activeItem] = new Result($facet, $activeItem, $dayDisplay, 0);
+                    $results[$activeItem]->setActiveState(TRUE);
+                    // TODO is this needed?
+                    $config = $this->getConfiguration();
+                    $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_DAY;
+                    $this->setConfiguration($config);
+                    break;
 
-            if ($hyphonCount == 1) {
-                // TODO - Create the exploded one here.
-                $granularity = 'month';
-                $explodedActiveItem = explode('-', $activeItem);
-                $yearValue = $explodedActiveItem[0];
-                //TODO - Fix count here.
-                // Create Year facet.
-                $results[$yearValue] = new Result($facet, $yearValue, $yearValue, 0);
-                $results[$yearValue]->setActiveState(TRUE);
-                //TODO - Fix count
-                // Create month facet.
-                $monthDisplay = \DateTime::createFromFormat('Y-m', $activeItem)->format('F Y');
-                $results[$activeItem] = new Result($facet, $activeItem, $monthDisplay, 0);
-                $results[$activeItem]->setActiveState(TRUE);
-                $this->createFacets($facet, $params, $activeItem, $granularity, $results);
-            }
-            if ($hyphonCount == 2) {
-                $granularity = 'day';
-                // TODO - Need helper for this.
-                $explodedActiveItem = explode('-', $activeItem);
-                $yearValue = $explodedActiveItem[0];
-                $monthValue = $explodedActiveItem[1];
-                // TODO - Should extract this to helper... CreateActiveFacets or so and use it for Year Month & day...
-                // TODO - Get count. Another reason to create a helper...
-                // Create Year facet.
-                $results[$yearValue] = new Result($facet, $yearValue, $yearValue, 0);
-                $results[$yearValue]->setActiveState(TRUE);
-                //TODO - Fix count
-                // Create month facet.
-                $monthDisplay = \DateTime::createFromFormat('Y-m', $yearValue . '-' . $monthValue)->format('F Y');
-                $results[$yearValue . '-' . $monthValue] = new Result($facet, $yearValue . '-' . $monthValue, $monthDisplay, 0);
-                $results[$yearValue . '-' . $monthValue]->setActiveState(TRUE);
-                // Create day facet.
-                // TODO fix count.
-                $dayDisplay = \DateTime::createFromFormat('Y-m-d', $activeItem)->format('jS  \o\f F Y');
-                $results[$activeItem] = new Result($facet, $activeItem, $dayDisplay, 0);
-                $results[$activeItem]->setActiveState(TRUE);
-
-
-
-                // TODO is this needed?
-                $config = $this->getConfiguration();
-                $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_DAY;
-                $this->setConfiguration($config);
             }
         }
         return $results;
@@ -277,12 +274,9 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                     $nextDay->setTime(0, 0, 0);
                     // TODO - Need to add a count check here - We only need to be displaying days with results.
                     if (!empty($day) && !empty($nextDay)) {
-
-
                         $dayTimestamp = $day->getTimestamp();
                         $nextDayTimestamp = $nextDay->getTimestamp();
-
-                        // Code duplication. We need to extract this to a helper function now...
+                        // TODO - Code duplication. We need to extract this to a helper function now...
                         $indexId = $facet->getFacetSource()
                             ->getIndex()
                             ->id();
