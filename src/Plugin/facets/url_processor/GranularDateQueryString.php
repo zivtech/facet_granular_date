@@ -6,6 +6,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Url;
 use Drupal\facets\FacetInterface;
 use Drupal\facets\UrlProcessor\UrlProcessorPluginBase;
+use Drupal\views\Views;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -204,6 +205,8 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                 }
                 $url->setOptions($options);
                 $results[$dateKeys['yearkey']]->setUrl($url);
+                $facetYearCount = $facet->getResults()[$dateKeys['yearkey']]->getCount();
+                $results[$dateKeys['yearkey']]->setCount($facetYearCount);
 
             }
             if ($dateKeys['monthcount'] === 1 && sizeof($results) > 1) {
@@ -217,7 +220,46 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                 }
                 $options['query']['f'][] = $field . ':' . $dateKeys['yearkey'];
                 $url->setOptions($options);
+                //TODO testing
+                $display_definition = $facet->getFacetSource()->getDisplay()->getPluginDefinition();
+                // TODO - Fix this. Needing to execute two querys is just silly.
+                $view = Views::getView($display_definition['view_id']);
+                $view->setDisplay($display_definition['view_display']);
+                $view->setArguments(['query' => 'news']);
+                $view->initQuery();
+                $view->initDisplay();
+                $view->preExecute();
+                $view->execute();
+                $q = $view->query;
+                $parseMode = $q->getSearchApiQuery()->getParseMode();
+                $keys = $q->getSearchApiQuery()->getKeys();
+                $fullTextFields = $q->getSearchApiQuery()->getFullTextFields();
+                $queryFacets = $q->getSearchApiQuery()->getOption('search_api_facets');
+                $index = $facet->getFacetSource()->getIndex();
+                $exclude = $facet->getExclude();
+                $query = $index->query();
+                $newKeys = &$query->getKeys();
+                $newKeys = $keys;
+                $query->setFulltextFields($fullTextFields);
+                $query->setParseMode($parseMode);
+                $query->setOption('search_api_facets', $queryFacets);
+                $explodedActiveItem = explode('-',$facet->getActiveItems()[0]);
+                $monthAndYear = $explodedActiveItem[0] . '-' . $explodedActiveItem[1];
+                // TODO - DI this.
+                $qtpm = \Drupal::service('plugin.manager.facets.query_type');
+                $queryType = $qtpm->createInstance($facet->getQueryType(), ['facet' => $facet, 'query' => $query]);
+                $filter = $query->createConditionGroup($facet->getQueryOperator(), ['facet:' . $field]);
+                $range = $queryType->calculateRange($monthAndYear);
+                $conjunction = $exclude ? 'OR' : 'AND';
+                $item_filter = $query->createConditionGroup($conjunction, ['facet:' . $field]);
+                $item_filter->addCondition($facet->getFieldIdentifier(), $range['start'], $exclude ? '<' : '>=');
+                $item_filter->addCondition($facet->getFieldIdentifier(), $range['stop'], $exclude ? '>' : '<=');
+                $filter->addConditionGroup($item_filter);
+                $query->addConditionGroup($filter);
+                $query->execute();
+                $facetMonthCount = $query->getResults()->getResultCount();
                 $results[$dateKeys['monthkey']]->setUrl($url);
+                $results[$dateKeys['monthkey']]->setCount($facetMonthCount);
             }
             if ($dateKeys['daycount'] === 1 && sizeof($results) > 1) {
                 $url = $results[$dateKeys['daykey']]->getUrl();
@@ -231,6 +273,9 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                 $options['query']['f'][] = $field . ':' .  $dateKeys['monthkey'];
                 $url->setOptions($options);
                 $results[$dateKeys['monthkey']]->setUrl($url);
+                $view = views_get_view_result($display_definition['view_id'], $display_definition['view_display']);
+                $facetDayCount = sizeof($view);
+                $results[$dateKeys['daykey']]->setCount($facetDayCount);
             }
         }
         // Restore page parameter again. See https://www.drupal.org/node/2726455.

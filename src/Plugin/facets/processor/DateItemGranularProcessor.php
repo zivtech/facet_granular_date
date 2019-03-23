@@ -49,7 +49,6 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             $facetActiveItems = $facet->getActiveItems();
             $activeItem = array_pop($facetActiveItems);
             $hyphonCount = substr_count($activeItem, '-');
-            // TODO - Change to switch
             switch($hyphonCount) {
                 case 0:
                     $granularity = 'year';
@@ -65,6 +64,9 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                     $this->setConfiguration($config);
                     break;
                 case 1:
+                    $config = $this->getConfiguration();
+                    $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_MONTH;
+                    $this->setConfiguration($config);
                     // TODO - Create the exploded one here.
                     $granularity = 'month';
                     $explodedActiveItem = explode('-', $activeItem);
