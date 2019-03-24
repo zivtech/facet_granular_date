@@ -220,7 +220,6 @@ class GranularDateQueryString extends UrlProcessorPluginBase {
                 }
                 $options['query']['f'][] = $field . ':' . $dateKeys['yearkey'];
                 $url->setOptions($options);
-                //TODO testing
                 $display_definition = $facet->getFacetSource()->getDisplay()->getPluginDefinition();
                 // TODO - Fix this. Needing to execute two querys is just silly.
                 $view = Views::getView($display_definition['view_id']);

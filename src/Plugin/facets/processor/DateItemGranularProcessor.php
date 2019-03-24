@@ -52,8 +52,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             switch($hyphonCount) {
                 case 0:
                     $granularity = 'year';
-                    //TODO - Fix count here.
-                    // Create Year facet.
+                    // Create Year facet - count gets added later.
                     $results[$activeItem] = new Result($facet, $activeItem, $activeItem, 0);
                     $this->createFacets($facet, $params, $activeItem, $granularity, $results);
                     if ($this->checkDateFacetsCount($params) > 1) {
@@ -67,16 +66,12 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                     $config = $this->getConfiguration();
                     $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_MONTH;
                     $this->setConfiguration($config);
-                    // TODO - Create the exploded one here.
                     $granularity = 'month';
-                    $explodedActiveItem = explode('-', $activeItem);
-                    $yearValue = $explodedActiveItem[0];
-                    //TODO - Fix count here.
-                    // Create Year facet.
-                    $results[$yearValue] = new Result($facet, $yearValue, $yearValue, 0);
-                    $results[$yearValue]->setActiveState(TRUE);
-                    //TODO - Fix count
-                    // Create month facet.
+                    $explodedActiveItem = $this->explodeActiveItem($activeItem);
+                    // Create Year facet - count gets added later
+                    $results[$explodedActiveItem['year']] = new Result($facet, $explodedActiveItem['year'], $explodedActiveItem['year'], 0);
+                    $results[$explodedActiveItem['year']]->setActiveState(TRUE);
+                    // Create month facet - count gets added later.
                     $monthDisplay = \DateTime::createFromFormat('Y-m', $activeItem)->format('F Y');
                     $results[$activeItem] = new Result($facet, $activeItem, $monthDisplay, 0);
                     $results[$activeItem]->setActiveState(TRUE);
@@ -84,26 +79,19 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                     break;
                 case 2:
                     $granularity = 'day';
-                    // TODO - Need helper for this.
-                    $explodedActiveItem = explode('-', $activeItem);
-                    $yearValue = $explodedActiveItem[0];
-                    $monthValue = $explodedActiveItem[1];
+                    $explodedActiveItem = $this->explodeActiveItem($activeItem);
                     // TODO - Should extract this to helper... CreateActiveFacets or so and use it for Year Month & day...
-                    // TODO - Get count. Another reason to create a helper...
-                    // Create Year facet.
-                    $results[$yearValue] = new Result($facet, $yearValue, $yearValue, 0);
-                    $results[$yearValue]->setActiveState(TRUE);
-                    //TODO - Fix count
-                    // Create month facet.
-                    $monthDisplay = \DateTime::createFromFormat('Y-m', $yearValue . '-' . $monthValue)->format('F Y');
-                    $results[$yearValue . '-' . $monthValue] = new Result($facet, $yearValue . '-' . $monthValue, $monthDisplay, 0);
-                    $results[$yearValue . '-' . $monthValue]->setActiveState(TRUE);
-                    // Create day facet.
-                    // TODO fix count.
+                    // Create Year facet - count gets added later.
+                    $results[$explodedActiveItem['year']] = new Result($facet, $explodedActiveItem['year'], $explodedActiveItem['year'], 0);
+                    $results[$explodedActiveItem['year']]->setActiveState(TRUE);
+                    // Create month facet - count gets added later.
+                    $monthDisplay = \DateTime::createFromFormat('Y-m', $explodedActiveItem['year'] . '-' . $explodedActiveItem['month'])->format('F Y');
+                    $results[$explodedActiveItem['year'] . '-' . $explodedActiveItem['month']] = new Result($facet, $explodedActiveItem['year'] . '-' . $explodedActiveItem['month'], $monthDisplay, 0);
+                    $results[$explodedActiveItem['year'] . '-' . $explodedActiveItem['month']]->setActiveState(TRUE);
+                    // Create day facet - count gets added later.
                     $dayDisplay = \DateTime::createFromFormat('Y-m-d', $activeItem)->format('jS  \o\f F Y');
                     $results[$activeItem] = new Result($facet, $activeItem, $dayDisplay, 0);
                     $results[$activeItem]->setActiveState(TRUE);
-                    // TODO is this needed?
                     $config = $this->getConfiguration();
                     $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_DAY;
                     $this->setConfiguration($config);
@@ -114,6 +102,15 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
         return $results;
     }
 
+    private function explodeActiveItem($activeItem) {
+        $explodedActiveItem = explode('-', $activeItem);
+        return [
+            'year' => (!empty($explodedActiveItem[0])) ? $explodedActiveItem[0] : NULL,
+            'month' => (!empty($explodedActiveItem[1])) ? $explodedActiveItem[1] : NULL,
+            'day' => (!empty($explodedActiveItem[2])) ? $explodedActiveItem[2] : NULL
+        ];
+    }
+
     private function getActiveMonth($params) {
         foreach ($params['f'] as $param) {
             $pos = strpos($param, 'issue_date');
@@ -121,28 +118,6 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             if ($pos !== FALSE && $pos2 !== FALSE) {
                 $value = explode("-", $param);
                 return $value[1];
-            }
-        }
-    }
-
-    /**
-     * Helper function.
-     *
-     * For the other facets in the site, check the value and add
-     * it as a query condition. Used to get the correct count for the new
-     * facet items.
-     * Ideally this will be removed when we get the proper count.
-     *
-     * @param $param
-     * @param $conditions
-     * @param $query
-     */
-    private function processConditions($param, $conditions, &$query) {
-        foreach ($conditions as $field => $condition) {
-            $pos = strpos($param, $condition);
-            if ($pos !== false) {
-                $value = explode(":", $param);
-                $query->addCondition($field, $value[1], '=');
             }
         }
     }
@@ -209,16 +184,13 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         // We need to use this index to return the result count for
                         // the newly created facets, since they aren't found automatically.
 
-                        //TODO - In my option - This is the hardest part of
-                        // open sourcing this code. I've scrubbed the data
-                        // but this is where I had to make a lot of assumptions
-                        // about the original site. This is all about getting
-                        // the count for each facet. There must be a better
-                        // way :/.
 
                         // Get the index ID from the facet. I think this should
                         // be safe without an !empty check since a facet
                         // always has to have an Index.
+                        // TODO create helper of this.
+                        // TODO - I think we can replace this with a search API query like I've done in the
+                        // query type.
                         $indexId = $facet->getFacetSource()
                             ->getIndex()
                             ->id();
@@ -226,19 +198,6 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         $field = $facet->getFieldIdentifier();
                         $query->addCondition('status', 1);
                         $query->addCondition($field, [$monthTimestamp, $nextMonthTimestamp], 'BETWEEN');
-                        // Add the extra facet information to get the count data.
-                        foreach ($params['f'] as $param) {
-                            // Other facets.
-                            $conditions = [
-                                'type' => 'content_type',
-                                'field_name 1' => 'field1',
-                                'field_name 2' => 'field2',
-                                'field_name_3' => 'field3',
-                            ];
-                            // Helper function that processes the conditions for the query
-                            // based on the other facet results
-                            $this->processConditions($param, $conditions, $query);
-                        }
                         // Run the query.
                         $entities = $query->execute();
                         if (!empty($results) && $entities->getResultCount() > 0) {
@@ -261,9 +220,8 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             case 'month':
                 $activeMonth = $this->getActiveMonth($params);
                 // TODO - Make this a helper. Use it a lot.
-                $explodedActiveItem = explode('-', $activeItems);
-                $yearValue = $explodedActiveItem[0];
-                $daysInCurrentMonth = cal_days_in_month(CAL_GREGORIAN, $activeMonth, $yearValue);
+                $explodedActiveItem = $this->explodeActiveItem($activeItems);
+                $daysInCurrentMonth = cal_days_in_month(CAL_GREGORIAN, $activeMonth, $explodedActiveItem['year']);
                 // Process days. PHP DateTime days start at 1. So start there.
                 for ($i = 1; $i < $daysInCurrentMonth; $i++) {
                     $day = \DateTime::createFromFormat('j', $i);
@@ -274,11 +232,12 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                     $day->setTime(0, 0, 0);
                     $nextDay = \DateTime::createFromFormat('Y-m-d', $activeItems . '-' . $iPlusOne);
                     $nextDay->setTime(0, 0, 0);
-                    // TODO - Need to add a count check here - We only need to be displaying days with results.
                     if (!empty($day) && !empty($nextDay)) {
                         $dayTimestamp = $day->getTimestamp();
                         $nextDayTimestamp = $nextDay->getTimestamp();
                         // TODO - Code duplication. We need to extract this to a helper function now...
+                        // TODO - I think we can replace this with a search API query like I've done in the
+                        // query type.
                         $indexId = $facet->getFacetSource()
                             ->getIndex()
                             ->id();
@@ -286,33 +245,19 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         $dayField = $facet->getFieldIdentifier();
                         $dayQuery->addCondition('status', 1);
                         $dayQuery->addCondition($dayField, [$dayTimestamp, $nextDayTimestamp], 'BETWEEN');
-                        // Add the extra facet information to get the count data.
-                        foreach ($params['f'] as $param) {
-                            // Other facets.
-                            $conditions = [
-                                'type' => 'content_type',
-                                'field_name 1' => 'field1',
-                                'field_name 2' => 'field2',
-                                'field_name_3' => 'field3',
-                            ];
-                            // Helper function that processes the conditions for the query
-                            // based on the other facet results
-                            $this->processConditions($param, $conditions, $dayQuery);
-                        }
                         // Run the query.
                         $dayEntities = $dayQuery->execute();
 
                         if ($dayEntities->getResultCount() > 0) {
-                            $explodedActiveItem = explode('-', $activeItems);
-                            $yearValue = $explodedActiveItem[0];
-                            $displayValue = $day->format('jS') . ' of ' . $month->format('F') . ' ' . $yearValue;
+                            $explodedActiveItem = $this->explodeActiveItem($activeItems);
+                            $displayValue = $day->format('jS') . ' of ' . $month->format('F') . ' ' . $explodedActiveItem['year'];
                             $results[$activeItems . '-' . $day->format('d')] = new Result($facet, $activeItems . '-' . $day->format('d'), $displayValue, $dayEntities->getResultCount());
                         }
                     }
                 }
                 $activeItemCode = $activeItems;
+                // TODO - I think this can be removed?
                 if (!empty($activeItemCode) && empty($results[$activeItemCode])) {
-                    //TODO - Fix count here.
                     $display = \DateTime::createFromFormat('Y-m', $activeItemCode)->format('F Y');
                     $results[$activeItemCode] = new Result($facet, $activeItemCode, $display, 0);
                 }
