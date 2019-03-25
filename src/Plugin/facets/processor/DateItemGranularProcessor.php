@@ -9,7 +9,6 @@ use Drupal\facets\Processor\ProcessorPluginBase;
 use Drupal\facet_granular_date\Plugin\facets\query_type\SearchApiDateGranular;
 use Drupal\search_api\Entity\Index;
 use Drupal\facets\Result\Result;
-use Drupal\Core\Url;
 
 /**
  * Provides a processor for granular dates.
@@ -48,53 +47,31 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             // Get the active facet year (and month if selected).
             $facetActiveItems = $facet->getActiveItems();
             $activeItem = array_pop($facetActiveItems);
+            // Hyphons determine the format -
+            // 0 - Year, 1 - Month, 2 - Day.
             $hyphonCount = substr_count($activeItem, '-');
             switch($hyphonCount) {
                 case 0:
                     $granularity = 'year';
-                    // Create Year facet - count gets added later.
-                    $results[$activeItem] = new Result($facet, $activeItem, $activeItem, 0);
+                    // Create the active item facet.
+                    $this->createActiveFacet($facet, $activeItem, 'year', $results);
+                    // Create the new facets for filtering.
                     $this->createFacets($facet, $params, $activeItem, $granularity, $results);
-                    if ($this->checkDateFacetsCount($params) > 1) {
-                        $this->unsetAllInactiveFacetResults($results);
-                    }
-                    $config = $this->getConfiguration();
-                    $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_YEAR;
-                    $this->setConfiguration($config);
                     break;
                 case 1:
-                    $config = $this->getConfiguration();
-                    $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_MONTH;
-                    $this->setConfiguration($config);
                     $granularity = 'month';
-                    $explodedActiveItem = $this->explodeActiveItem($activeItem);
-                    // Create Year facet - count gets added later
-                    $results[$explodedActiveItem['year']] = new Result($facet, $explodedActiveItem['year'], $explodedActiveItem['year'], 0);
-                    $results[$explodedActiveItem['year']]->setActiveState(TRUE);
-                    // Create month facet - count gets added later.
-                    $monthDisplay = \DateTime::createFromFormat('Y-m', $activeItem)->format('F Y');
-                    $results[$activeItem] = new Result($facet, $activeItem, $monthDisplay, 0);
-                    $results[$activeItem]->setActiveState(TRUE);
+                    // Create the active item facets.
+                    $this->createActiveFacet($facet, $activeItem, 'year', $results);
+                    $this->createActiveFacet($facet, $activeItem, 'month', $results);
+                    // Create the new facets for filtering.
                     $this->createFacets($facet, $params, $activeItem, $granularity, $results);
                     break;
                 case 2:
-                    $granularity = 'day';
-                    $explodedActiveItem = $this->explodeActiveItem($activeItem);
-                    // TODO - Should extract this to helper... CreateActiveFacets or so and use it for Year Month & day...
-                    // Create Year facet - count gets added later.
-                    $results[$explodedActiveItem['year']] = new Result($facet, $explodedActiveItem['year'], $explodedActiveItem['year'], 0);
-                    $results[$explodedActiveItem['year']]->setActiveState(TRUE);
-                    // Create month facet - count gets added later.
-                    $monthDisplay = \DateTime::createFromFormat('Y-m', $explodedActiveItem['year'] . '-' . $explodedActiveItem['month'])->format('F Y');
-                    $results[$explodedActiveItem['year'] . '-' . $explodedActiveItem['month']] = new Result($facet, $explodedActiveItem['year'] . '-' . $explodedActiveItem['month'], $monthDisplay, 0);
-                    $results[$explodedActiveItem['year'] . '-' . $explodedActiveItem['month']]->setActiveState(TRUE);
-                    // Create day facet - count gets added later.
-                    $dayDisplay = \DateTime::createFromFormat('Y-m-d', $activeItem)->format('jS  \o\f F Y');
-                    $results[$activeItem] = new Result($facet, $activeItem, $dayDisplay, 0);
-                    $results[$activeItem]->setActiveState(TRUE);
-                    $config = $this->getConfiguration();
-                    $config['granularity'] = SearchApiDateGranular::FACETAPI_DATE_DAY;
-                    $this->setConfiguration($config);
+                    // Day. Doesn't need a granularity, it's the ending point right now.
+                    // Create the active item facets.
+                    $this->createActiveFacet($facet, $activeItem, 'year', $results);
+                    $this->createActiveFacet($facet, $activeItem, 'month', $results);
+                    $this->createActiveFacet($facet, $activeItem, 'day', $results);
                     break;
 
             }
@@ -102,6 +79,42 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
         return $results;
     }
 
+    private function createActiveFacet($facet, $activeItem, $granularity, &$results) {
+        $explodedActiveItem = $this->explodeActiveItem($activeItem);
+        switch($granularity) {
+            case 'year':
+                // Create Year facet - count gets added later
+                $results[$explodedActiveItem['year']] = new Result($facet, $explodedActiveItem['year'], $explodedActiveItem['year'], 0);
+                $results[$explodedActiveItem['year']]->setActiveState(TRUE);
+                // Create month facet - count gets added later.
+                //$monthDisplay = \DateTime::createFromFormat('Y-m', $activeItem)->format('F Y');
+                //$results[$activeItem] = new Result($facet, $activeItem, $monthDisplay, 0);
+                break;
+            case 'month':
+                $yearMonth = $explodedActiveItem['year'] . '-' . $explodedActiveItem['month'];
+                // Create month facet - count gets added later.
+                $monthDisplay = \DateTime::createFromFormat('Y-m', $yearMonth)->format('F Y');
+                $results[$yearMonth] = new Result($facet, $yearMonth, $monthDisplay, 0);
+                $results[$yearMonth]->setActiveState(TRUE);
+                break;
+            case 'day':
+                $yearMonthDay = $explodedActiveItem['year'] . '-' . $explodedActiveItem['month'] . '-' . $explodedActiveItem['day'];
+                // Create day facet - count gets added later.
+                $dayDisplay = \DateTime::createFromFormat('Y-m-d', $yearMonthDay)->format('jS  \o\f F Y');
+                $results[$yearMonthDay] = new Result($facet, $yearMonthDay, $dayDisplay, 0);
+                $results[$yearMonthDay]->setActiveState(TRUE);
+                break;
+        }
+    }
+
+    /**
+     * Helper function.
+     *
+     * Explode the active item into usable keys.
+     *
+     * @param $activeItem
+     * @return array
+     */
     private function explodeActiveItem($activeItem) {
         $explodedActiveItem = explode('-', $activeItem);
         return [
@@ -111,58 +124,10 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
         ];
     }
 
-    private function getActiveMonth($params) {
-        foreach ($params['f'] as $param) {
-            $pos = strpos($param, 'issue_date');
-            $pos2 = strpos($param, '-');
-            if ($pos !== FALSE && $pos2 !== FALSE) {
-                $value = explode("-", $param);
-                return $value[1];
-            }
-        }
-    }
-
-    /**
-     * Helper function.
-     *
-     * Checks how many issue date facets are currently active.
-     *
-     * @param $params
-     * @return bool
-     */
-    private function checkDateFacetsCount($params) {
-        $count = 0;
-        foreach ($params['f'] as $param) {
-            $pos = strpos($param, 'issue_date');
-            if ($pos !== FALSE) {
-                $count++;
-            }
-        }
-        return $count;
-    }
-
-    /**
-     * Helper function.
-     *
-     * Removes all inactive facets for the issue date facet.
-     *
-     * This should just leave the year and month facets.
-     *
-     * @param $results
-     */
-    private function unsetAllInactiveFacetResults(&$results) {
-        foreach ($results as $key => $result) {
-            if(!$result->isActive()) {
-                unset($results[$key]);
-            }
-        }
-    }
-
     private function createFacets($facet, $params, $activeItems, $granularity, &$results) {
         switch ($granularity) {
             case 'year':
                 for ($i = 1; $i < 13; $i++) {
-
                     $iPlusOne = $i + 1;
                     // Get the  current and next month Objects + Set the time to 00:00:00
                     $month = \DateTime::createFromFormat('d-n-Y', '01-' . $i . '-' . $activeItems);
@@ -201,30 +166,17 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         // Run the query.
                         $entities = $query->execute();
                         if (!empty($results) && $entities->getResultCount() > 0) {
-                            // TODO - This is temporary data. Make this the request URI.
-                            $url = Url::fromUri('internal://node/1');
-                            if (!empty(reset($results)->getUrl())) {
-                                $url = clone reset($results)->getUrl();
-                            }
-
-                            $options = $url->getOptions();
-                            unset($options['query']['f']);
-                            $options['query']['f'][] = $field . ':' . $activeItems . '-' . $monthNumber;
-                            $url->setOptions($options);
                             $results[$activeItems . '-' . $monthNumber] = new Result($facet, $activeItems . '-' . $monthNumber, $monthName . ' ' . $activeItems, $entities->getResultCount());
-                            $results[$activeItems . '-' . $monthNumber]->setUrl($url);
                         }
                     }
                 }
                 break;
             case 'month':
-                $activeMonth = $this->getActiveMonth($params);
-                // TODO - Make this a helper. Use it a lot.
                 $explodedActiveItem = $this->explodeActiveItem($activeItems);
+                $activeMonth = $explodedActiveItem['month'];
                 $daysInCurrentMonth = cal_days_in_month(CAL_GREGORIAN, $activeMonth, $explodedActiveItem['year']);
                 // Process days. PHP DateTime days start at 1. So start there.
                 for ($i = 1; $i < $daysInCurrentMonth; $i++) {
-                    $day = \DateTime::createFromFormat('j', $i);
                     $month = \DateTime::createFromFormat('m', $activeMonth);
                     $iPlusOne = $i + 1;
                     // Get the  current and next month Objects + Set the time to 00:00:00
@@ -255,29 +207,19 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         }
                     }
                 }
-                $activeItemCode = $activeItems;
-                // TODO - I think this can be removed?
-                if (!empty($activeItemCode) && empty($results[$activeItemCode])) {
-                    $display = \DateTime::createFromFormat('Y-m', $activeItemCode)->format('F Y');
-                    $results[$activeItemCode] = new Result($facet, $activeItemCode, $display, 0);
-                }
-                if (!empty($activeItemCode) && !empty($results[$activeItemCode])) {
-                    $results[$activeItemCode]->setActiveState(TRUE);
-                }
                 break;
-            case 'day':
-                break;
-
         }
     }
 
     /**
      * Human readable array of granularity options.
      *
+     * TODO - Remove if everything still works before commit.
+     *
      * @return array
      *   An array of granularity options.
      */
-    private function granularityOptions() {
+    /*private function granularityOptions() {
         return [
             SearchApiDateGranular::FACETAPI_DATE_YEAR => $this->t('Year'),
             SearchApiDateGranular::FACETAPI_DATE_MONTH => $this->t('Month'),
@@ -286,7 +228,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             SearchApiDateGranular::FACETAPI_DATE_MINUTE => $this->t('Minute'),
             SearchApiDateGranular::FACETAPI_DATE_SECOND => $this->t('Second'),
         ];
-    }
+    }*/
 
     /**
      * {@inheritdoc}
@@ -299,6 +241,7 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
 
     /**
      * {@inheritdoc}
+     *  TODO - Can we change this to not mess with other date query types?
      */
     public function getQueryType() {
         return 'date';
