@@ -6,20 +6,24 @@ Clicking January 2018 will create facets for 1st January 2018, 2nd January 2018 
 
 See https://www.drupal.org/project/facets/issues/2802571
 
-NOT EVEN CLOSE TO PRODUCTION READY.
+This module was built to solve the issue above where date facets are no longer drilldown in Drupal 8. 
+This module provides a new Facet processor to achieve that. See the image below for how it works.
 
+{Image of Years}
+{Image on Months with year clicked}
+{Image of Days with month clicked.
 
-This repo is an Attempt to Open source a tool I made for a client a long time ago. Unfortunatly time was short for
-that client so I made a lot of site specific shortcuts and the code *really* got away from me in the end. BUT it
-works on that site. Now we just need to make it work on all sites!
+Configuration reguired:
+
+{Images of config, facet page and facet source page.}
+
+This module is now ready for testing in pre production. I've tested it on two different sites and it's
+worked well. I would love some more testing done on it, 
+especially in environments with 5,000+ indexed nodes. 
 
 Work to do:
-
-Make it work!
-Review all todos and fix.
-Clean up the DateItemGranularProcessor.php class (This is where the majority of the logic is and where it got away
-me the most. Needs a lot of work.)
-General code clean up (line by line probably! Lots could be done a lot better.
-Add tests.
+- More code clean up - Still a few things that could be done better, far more efficient. Marked by TODOs in the code.
+If anyone is interesting in submitting patchs or PRs I would be happy to review them.
+- Add tests.
 
 

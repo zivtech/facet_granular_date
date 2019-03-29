@@ -6,29 +6,12 @@ use Drupal\facets\FacetInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\facets\Processor\BuildProcessorInterface;
 use Drupal\facets\Processor\ProcessorPluginBase;
-//use Drupal\facets\Plugin\facets\query_type\SearchApiDate;
 use Drupal\facet_granular_date\Plugin\facets\query_type\SearchApiDateGranular;
 use Drupal\search_api\Entity\Index;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Language\LanguageManagerInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\Core\TypedData\ComplexDataDefinitionInterface;
-use Drupal\Core\TypedData\DataReferenceDefinitionInterface;
-use Drupal\Core\TypedData\TranslatableInterface;
-use Drupal\facets\Exception\InvalidProcessorException;
 use Drupal\facets\Result\Result;
-use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\Core\Url;
 
 /**
- * Provides a processor for dates.
- *
- * TODO - This whole class needs review. It might be mostly experimental
- *  and/or pointless.
- *
- * TODO - Gross. On review I forgot how far away from me this code got.
- *   There is a whole bunch of code duplication and grossness. Lots to
- *   do in this class.
+ * Provides a processor for granular dates.
  *
  * @FacetsProcessor(
  *   id = "date_granular_item",
@@ -50,9 +33,8 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
      *
      */
     public function build(FacetInterface $facet, array $results) {
-
-        // We only want this to run if the year as already been selected.
-        // Otherwise dob't alter the results.
+        // We only want this to run if a facet is active.
+        // Otherwise don't alter the results.
         if(!empty($facet->getActiveItems())) {
             // Remove all other years.
             foreach ($results as $key => $result) {
@@ -63,24 +45,119 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
             // Get the params from facets already selected.
             $params = \Drupal::request()->query->all();
             // Get the active facet year (and month if selected).
-            $activeItem = $facet->getActiveItems();
-            // This will always be the year.
-            $activeItemFirst = $activeItem[0];
-            $activeItemSecond = isset($activeItem[1]) ? $activeItem[1] : NULL;
-            if (!empty($activeItemFirst) && empty($activeItemSecond)) {
-                //if (!empty($activeItemFirst)) {
-                // Process months. PHP DateTime months start at 1. So start there.
-                for ($i = 1; $i < 13; $i++) {
+            $facetActiveItems = $facet->getActiveItems();
+            $activeItem = array_pop($facetActiveItems);
+            // Hyphons determine the format -
+            // 0 - Year, 1 - Month, 2 - Day.
+            $hyphonCount = substr_count($activeItem, '-');
+            switch($hyphonCount) {
+                case 0:
+                    $granularity = 'year';
+                    // Create the active item facet.
+                    $this->createActiveFacet($facet, $activeItem, 'year', $results);
+                    // Create the new facets for filtering.
+                    $this->createFacets($facet, $params, $activeItem, $granularity, $results);
+                    break;
+                case 1:
+                    $granularity = 'month';
+                    // Create the active item facets.
+                    $this->createActiveFacet($facet, $activeItem, 'year', $results);
+                    $this->createActiveFacet($facet, $activeItem, 'month', $results);
+                    // Create the new facets for filtering.
+                    $this->createFacets($facet, $params, $activeItem, $granularity, $results);
+                    break;
+                case 2:
+                    // Day. Doesn't need a granularity, it's the ending point right now.
+                    // Create the active item facets.
+                    $this->createActiveFacet($facet, $activeItem, 'year', $results);
+                    $this->createActiveFacet($facet, $activeItem, 'month', $results);
+                    $this->createActiveFacet($facet, $activeItem, 'day', $results);
+                    break;
 
+            }
+        }
+        return $results;
+    }
+
+    /**
+     * Helper function.
+     *
+     * Create an active facet for the granularity passed.
+     *
+     * @param $facet
+     * @param $activeItem
+     * @param $granularity
+     * @param $results
+     */
+    private function createActiveFacet($facet, $activeItem, $granularity, &$results) {
+        $explodedActiveItem = $this->explodeActiveItem($activeItem);
+        switch($granularity) {
+            case 'year':
+                // Create Year facet - count gets added later
+                $results[$explodedActiveItem['year']] = new Result($facet, $explodedActiveItem['year'], $explodedActiveItem['year'], 0);
+                $results[$explodedActiveItem['year']]->setActiveState(TRUE);
+                // Create month facet - count gets added later.
+                //$monthDisplay = \DateTime::createFromFormat('Y-m', $activeItem)->format('F Y');
+                //$results[$activeItem] = new Result($facet, $activeItem, $monthDisplay, 0);
+                break;
+            case 'month':
+                $yearMonth = $explodedActiveItem['year'] . '-' . $explodedActiveItem['month'];
+                // Create month facet - count gets added later.
+                $monthDisplay = \DateTime::createFromFormat('Y-m', $yearMonth)->format('F Y');
+                $results[$yearMonth] = new Result($facet, $yearMonth, $monthDisplay, 0);
+                $results[$yearMonth]->setActiveState(TRUE);
+                break;
+            case 'day':
+                $yearMonthDay = $explodedActiveItem['year'] . '-' . $explodedActiveItem['month'] . '-' . $explodedActiveItem['day'];
+                // Create day facet - count gets added later.
+                $dayDisplay = \DateTime::createFromFormat('Y-m-d', $yearMonthDay)->format('jS  \o\f F Y');
+                $results[$yearMonthDay] = new Result($facet, $yearMonthDay, $dayDisplay, 0);
+                $results[$yearMonthDay]->setActiveState(TRUE);
+                break;
+        }
+    }
+
+    /**
+     * Helper function.
+     *
+     * Explode the active item into usable keys.
+     *
+     * @param $activeItem
+     * @return array
+     */
+    private function explodeActiveItem($activeItem) {
+        $explodedActiveItem = explode('-', $activeItem);
+        return [
+            'year' => (!empty($explodedActiveItem[0])) ? $explodedActiveItem[0] : NULL,
+            'month' => (!empty($explodedActiveItem[1])) ? $explodedActiveItem[1] : NULL,
+            'day' => (!empty($explodedActiveItem[2])) ? $explodedActiveItem[2] : NULL
+        ];
+    }
+
+    /**
+     * Helper function.
+     *
+     * Create all the new facet results.
+     *
+     * @param $facet
+     * @param $params
+     * @param $activeItems
+     * @param $granularity
+     * @param $results
+     */
+    private function createFacets($facet, $params, $activeItems, $granularity, &$results) {
+        switch ($granularity) {
+            case 'year':
+                for ($i = 1; $i < 13; $i++) {
                     $iPlusOne = $i + 1;
                     // Get the  current and next month Objects + Set the time to 00:00:00
-                    $month = \DateTime::createFromFormat('d-n-Y', '01-' . $i . '-' . $activeItemFirst);
-                    $month->setTime(0,0,0);
-                    $nextMonth = \DateTime::createFromFormat('d-n-Y', '01-' . $iPlusOne . '-' . $activeItemFirst);
-                    $nextMonth->setTime(0,0,0);
+                    $month = \DateTime::createFromFormat('d-n-Y', '01-' . $i . '-' . $activeItems);
+                    $month->setTime(0, 0, 0);
+                    $nextMonth = \DateTime::createFromFormat('d-n-Y', '01-' . $iPlusOne . '-' . $activeItems);
+                    $nextMonth->setTime(0, 0, 0);
                     if (!empty($month) && !empty($nextMonth)) {
-                        $month->setTime(0,0,0);
-                        $nextMonth->setTime(0,0,0);
+                        $month->setTime(0, 0, 0);
+                        $nextMonth->setTime(0, 0, 0);
                         $monthTimestamp = $month->getTimestamp();
                         $nextMonthTimestamp = $nextMonth->getTimestamp();
                         // Get the month in the n format (month number, without leading 0).
@@ -93,16 +170,13 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         // We need to use this index to return the result count for
                         // the newly created facets, since they aren't found automatically.
 
-                        //TODO - In my option - This is the hardest part of
-                        // open sourcing this code. I've scrubbed the data
-                        // but this is where I had to make a lot of assumptions
-                        // about the original site. This is all about getting
-                        // the count for each facet. There must be a better
-                        // way :/.
 
                         // Get the index ID from the facet. I think this should
                         // be safe without an !empty check since a facet
                         // always has to have an Index.
+                        // TODO create helper of this.
+                        // TODO - I think we can replace this with a search API query like I've done in the
+                        // query type.
                         $indexId = $facet->getFacetSource()
                             ->getIndex()
                             ->id();
@@ -110,246 +184,64 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
                         $field = $facet->getFieldIdentifier();
                         $query->addCondition('status', 1);
                         $query->addCondition($field, [$monthTimestamp, $nextMonthTimestamp], 'BETWEEN');
-                        // Add the extra facet information to get the count data.
-                        foreach ($params['f'] as $param) {
-                            // Other facets.
-                            $conditions = [
-                                'type' => 'content_type',
-                                'field_name 1' => 'field1',
-                                'field_name 2' => 'field2',
-                                'field_name_3' => 'field3',
-                            ];
-                            // Helper function that processes the conditions for the query
-                            // based on the other facet results
-                            $this->processConditions($param, $conditions, $query);
-                            // Process the field for the facet label and raw value.
-                            $pos = strpos($param, $field);
-                            $pos2 = strpos($param, '-');
-                            if ($pos !== false && $pos2 !== false) {
-                                $value = explode(":", $param);
-                                $activeItemCode = $value[1];
-                            }
-                        }
-                        // Add the body search if the search bar has been filled out.
-                        //TODO. Fix this..
-                        /*if (!empty($params['query'])) {
-                            $query->addCondition('body', $params['query'], 'CONTAINS');
-                        }*/
-                        // Run the query.
-                        $entities = $query->execute();
-                        if ($entities->getResultCount() > 0) {
-                            // TODO - This is temporary data. Make this the request URI.
-                            $url = Url::fromUri('internal://node/1');
-                            if (!empty(reset($results)->getUrl())) {
-                                $url = clone reset($results)->getUrl();
-                            }
-                            $options = $url->getOptions();
-                            $options['query']['f'][] = $field . ':' . reset($results)->getDisplayValue();
-                            $options['query']['f'][] = $field . ':' . $activeItemFirst . '-' . $monthNumber;
-                            $url->setOptions($options);
-                            $results[$activeItemFirst . '-' . $monthNumber] = new Result($facet, $activeItemFirst . '-' . $monthNumber, $monthName . ' ' . $activeItemFirst, $entities->getResultCount());
-                            $results[$activeItemFirst . '-' . $monthNumber]->setUrl($url);
-                            if (!empty($activeItemCode) && !empty($results[$activeItemCode])) {
-                                $results[$activeItemCode]->setActiveState(TRUE);
-                            }
-                        }
-                    }
-                }
-                if ($this->checkDateFacetsCount($params) > 1) {
-                    $this->unsetAllInactiveFacetResults($results);
-                }
-            }
-            //TODO - This whole thing is code duplication. Gross. Fix this.
-            if (!empty($activeItemFirst) && !empty($activeItemSecond)) {
-                $activeMonth = $this->getActiveMonth($params);
-                $daysInCurrentMonth = cal_days_in_month(CAL_GREGORIAN, $activeMonth, $activeItemFirst);
-                // Process months. PHP DateTime months start at 1. So start there.
-                for ($i = 1; $i < $daysInCurrentMonth; $i++) {
-
-                    $day = \DateTime::createFromFormat('j', $i);
-                    $month = \DateTime::createFromFormat('m', $activeMonth);
-                    $iPlusOne = $i + 1;
-                    // Get the  current and next month Objects + Set the time to 00:00:00
-                    $day = \DateTime::createFromFormat('Y-m-d', $activeItemSecond . '-' . $i);
-                    $day->setTime(0,0,0);
-                    $nextDay = \DateTime::createFromFormat('Y-m-d', $activeItemSecond . '-' . $iPlusOne);
-                    $nextDay->setTime(0,0,0);
-                    if (!empty($day) && !empty($nextDay)) {
-                        $dayTimestamp = $day->getTimestamp();
-                        $nextDayTimestamp = $nextDay->getTimestamp();
-                        // Get the month in the n format (month number, without leading 0).
-                        $dayObj = \DateTime::createFromFormat('n', $i);
-                        // Human readable month.
-                        $dayName = $dayObj->format('F');
-                        // Month with leading 0.
-                        $dayNumber = $dayObj->format('m');
-                        // Create the query on the index.
-                        // We need to use this index to return the result count for
-                        // the newly created facets, since they aren't found automatically.
-                        // Get the index ID from the facet. I think this should
-                        // be safe without an !empty check since a facet
-                        // always has to have an Index.
-                        $indexId = $facet->getFacetSource()
-                            ->getIndex()
-                            ->id();
-                        $field = $facet->getFieldIdentifier();
-                        $facetId = $facet->id();
-                        $query = Index::load($indexId)->query();
-                        $query->addCondition('status', 1);
-                        $query->addCondition($field, [$dayTimestamp, $nextDayTimestamp], 'BETWEEN');
-                        // Add the extra facet information to get the count data.
-                        foreach ($params['f'] as $param) {
-                            // Other facets.
-                            $conditions = [
-                                'type' => 'content_type',
-                                'field_1' => 'field1',
-                                'field_2' => 'field2',
-                                'field_3' => 'field3',
-                            ];
-                            // Helper function that processes the conditions for the query
-                            // based on the other facet results
-                            $this->processConditions($param, $conditions, $query);
-                            // Process the field for the facet label and raw value.
-                            $pos = strpos($param, $facetId);
-                            $pos2 = strpos($param, '-');
-                            if ($pos !== false && $pos2 !== false) {
-                                $value = explode(":", $param);
-                                $activeItemCode = $value[1];
-                            }
-                        }
-                        /*// Add the body search if the search bar has been filled out.
-                        if (!empty($params['query'])) {
-                            $query->addCondition('body', $params['query'], 'CONTAINS');
-                        }*/
                         // Run the query.
                         $entities = $query->execute();
                         if (!empty($results) && $entities->getResultCount() > 0) {
-                            // TODO - This is temporary data. Make this the request URI.
-                            $url = Url::fromUri('internal://node/1');
-                            if (!empty(reset($results)->getUrl())) {
-                                $url = clone reset($results)->getUrl();
-                            }
-                            $options = $url->getOptions();
-                            $options['query']['f'][] = $field . ':' . reset($results)->getDisplayValue();
-                            $options['query']['f'][] = $field . ':' . $activeItemSecond;
-                            $options['query']['f'][] = $field . ':' . $activeItemSecond . '-' . $i;
-                            $url->setOptions($options);
-                            $displayValue = $day->format('jS') . ' of ' . $month->format('F') . ' ' . $activeItemFirst;
-                            $results[$activeItemSecond . '-' . $i] = new Result($facet, $activeItemSecond . '-' . $i, $displayValue, $entities->getResultCount());
-                            $results[$activeItemSecond . '-' . $i]->setUrl($url);
-                            if (!empty($activeItemCode) && empty($results[$activeItemCode])) {
-                                //TODO - Fix count here.
-                                $display = \DateTime::createFromFormat('Y-m', $activeItemCode)->format('F Y');
-                                $results[$activeItemCode] = new Result($facet, $activeItemCode, $display, 0);
-                            }
-                            if (!empty($activeItemCode) && !empty($results[$activeItemCode])) {
-                                $results[$activeItemCode]->setActiveState(TRUE);
-                            }
+                            $results[$activeItems . '-' . $monthNumber] = new Result($facet, $activeItems . '-' . $monthNumber, $monthName . ' ' . $activeItems, $entities->getResultCount());
                         }
                     }
                 }
-            }
-        }
-        return $results;
-    }
+                break;
+            case 'month':
+                $explodedActiveItem = $this->explodeActiveItem($activeItems);
+                $activeMonth = $explodedActiveItem['month'];
+                $daysInCurrentMonth = cal_days_in_month(CAL_GREGORIAN, $activeMonth, $explodedActiveItem['year']);
+                // Process days. PHP DateTime days start at 1. So start there.
+                for ($i = 1; $i < $daysInCurrentMonth; $i++) {
+                    $month = \DateTime::createFromFormat('m', $activeMonth);
+                    $iPlusOne = $i + 1;
+                    // Get the  current and next month Objects + Set the time to 00:00:00
+                    $day = \DateTime::createFromFormat('Y-m-d', $activeItems . '-' . $i);
+                    $day->setTime(0, 0, 0);
+                    $nextDay = \DateTime::createFromFormat('Y-m-d', $activeItems . '-' . $iPlusOne);
+                    $nextDay->setTime(0, 0, 0);
+                    if (!empty($day) && !empty($nextDay)) {
+                        $dayTimestamp = $day->getTimestamp();
+                        $nextDayTimestamp = $nextDay->getTimestamp();
+                        // TODO - Code duplication. We need to extract this to a helper function now...
+                        // TODO - I think we can replace this with a search API query like I've done in the
+                        // query type.
+                        $indexId = $facet->getFacetSource()
+                            ->getIndex()
+                            ->id();
+                        $dayQuery = Index::load($indexId)->query();
+                        $dayField = $facet->getFieldIdentifier();
+                        $dayQuery->addCondition('status', 1);
+                        $dayQuery->addCondition($dayField, [$dayTimestamp, $nextDayTimestamp], 'BETWEEN');
+                        // Run the query.
+                        $dayEntities = $dayQuery->execute();
 
-    function getActiveMonth($params) {
-        foreach ($params['f'] as $param) {
-            $pos = strpos($param, 'issue_date');
-            $pos2 = strpos($param, '-');
-            if ($pos !== FALSE && $pos2 !== FALSE) {
-                $value = explode("-", $param);
-                return $value[1];
-            }
+                        if ($dayEntities->getResultCount() > 0) {
+                            $explodedActiveItem = $this->explodeActiveItem($activeItems);
+                            $displayValue = $day->format('jS') . ' of ' . $month->format('F') . ' ' . $explodedActiveItem['year'];
+                            $results[$activeItems . '-' . $day->format('d')] = new Result($facet, $activeItems . '-' . $day->format('d'), $displayValue, $dayEntities->getResultCount());
+                        }
+                    }
+                }
+                break;
         }
-    }
-
-    /**
-     * Helper function.
-     *
-     * For the other facets in the site, check the value and add
-     * it as a query condition. Used to get the correct count for the new
-     * facet items.
-     * Ideally this will be removed when we get the proper count.
-     *
-     * @param $param
-     * @param $conditions
-     * @param $query
-     */
-    private function processConditions($param, $conditions, &$query) {
-        foreach ($conditions as $field => $condition) {
-            $pos = strpos($param, $condition);
-            if ($pos !== false) {
-                $value = explode(":", $param);
-                $query->addCondition($field, $value[1], '=');
-            }
-        }
-    }
-
-    /**
-     * Helper function.
-     *
-     * Checks how many issue date facets are currently active.
-     *
-     * @param $params
-     * @return bool
-     */
-    private function checkDateFacetsCount($params) {
-        $count = 0;
-        foreach ($params['f'] as $param) {
-            $pos = strpos($param, 'issue_date');
-            if ($pos !== FALSE) {
-                $count++;
-            }
-        }
-        return $count;
-    }
-
-    /**
-     * Helper function.
-     *
-     * Removes all inactive facets for the issue date facet.
-     *
-     * This should just leave the year and month facets.
-     *
-     * @param $results
-     */
-    private function unsetAllInactiveFacetResults(&$results) {
-        foreach ($results as $key => $result) {
-            if(!$result->isActive()) {
-                unset($results[$key]);
-            }
-        }
-    }
-
-    /**
-     * Human readable array of granularity options.
-     *
-     * @return array
-     *   An array of granularity options.
-     */
-    private function granularityOptions() {
-        return [
-            SearchApiDateGranular::FACETAPI_DATE_YEAR => $this->t('Year'),
-            SearchApiDateGranular::FACETAPI_DATE_MONTH => $this->t('Month'),
-            SearchApiDateGranular::FACETAPI_DATE_DAY => $this->t('Day'),
-            SearchApiDateGranular::FACETAPI_DATE_HOUR => $this->t('Hour'),
-            SearchApiDateGranular::FACETAPI_DATE_MINUTE => $this->t('Minute'),
-            SearchApiDateGranular::FACETAPI_DATE_SECOND => $this->t('Second'),
-        ];
     }
 
     /**
      * {@inheritdoc}
      */
     public function buildConfigurationForm(array $form, FormStateInterface $form_state, FacetInterface $facet) {
-        $this->getConfiguration();
-        $build = [];
-        return $build;
+        return [];
     }
 
     /**
      * {@inheritdoc}
+     *  TODO - Can we change this to not mess with other date query types?
      */
     public function getQueryType() {
         return 'date';

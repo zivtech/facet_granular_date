@@ -16,8 +16,7 @@ use Drupal\facets\QueryType\QueryTypeRangeBase;
  * implement dates, you can alter the ::getQueryTypesForDataType method on the
  * backendPlugin to return a different class.
  *
- * TODO - this is *mostly* a copy of the default date query type.
- *   needs a good review.
+ * To review - Maybe it could extend the existing SearchApiDate class?
  *
  * @FacetsQueryType(
  *   id = "search_api_dategranular",
@@ -70,7 +69,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
         $configuration['date_display'] = $dateProcessorConfig['date_display'];
         $configuration['date_format'] = $dateProcessorConfig['date_format'];
         $this->setConfiguration($configuration);
-        //kint(get_defined_vars());
     }
 
     /**
@@ -104,9 +102,14 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
         $granularity = $this->getGranularity();
         $pos = strpos($value, '-');
         if($pos !== false) {
-            $granularity = static::FACETAPI_DATE_MONTH;
+            // TODO swap to switch.
+            if (substr_count($value, '-') == 1) {
+                $granularity = static::FACETAPI_DATE_MONTH;
+            }
+            if (substr_count($value, '-') == 2) {
+                $granularity = static::FACETAPI_DATE_DAY;
+            }
         }
-
 
         $dateTime = new DrupalDateTime();
 
@@ -141,7 +144,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
                 $stopDate = $dateTime::createFromFormat('Y-m-d\TH:i:s', $value);
                 break;
         }
-
         return [
             'start' => $startDate->format('U'),
             'stop' => $stopDate->format('U'),
@@ -224,7 +226,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      *   An array with a start and end date as unix timestamps.
      */
     public function calculateResultFilter($value) {
-        //die('hereResultFilter');
         if ($this->getDateDisplay() === 'relative_date') {
             return $this->calculateResultFilterRelative($value);
         }
@@ -237,8 +238,6 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      * {@inheritdoc}
      */
     public function calculateResultFilterAbsolute($value) {
-        //die('hereResultFilterAb');
-        // TODO - Code gets here
         $date = new DrupalDateTime();
         $date->setTimestamp($value);
         $date_format = $this->getDateFormat();
@@ -429,7 +428,7 @@ class SearchApiDateGranular extends QueryTypeRangeBase {
      *   The granularity for this config.
      */
     protected function getGranularity() {
-        return static::FACETAPI_DATE_YEAR;
+        return $this->getConfiguration()['granularity'];
     }
 
     /**
