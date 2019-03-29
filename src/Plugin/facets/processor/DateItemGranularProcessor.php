@@ -79,6 +79,16 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
         return $results;
     }
 
+    /**
+     * Helper function.
+     *
+     * Create an active facet for the granularity passed.
+     *
+     * @param $facet
+     * @param $activeItem
+     * @param $granularity
+     * @param $results
+     */
     private function createActiveFacet($facet, $activeItem, $granularity, &$results) {
         $explodedActiveItem = $this->explodeActiveItem($activeItem);
         switch($granularity) {
@@ -124,6 +134,17 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
         ];
     }
 
+    /**
+     * Helper function.
+     *
+     * Create all the new facet results.
+     *
+     * @param $facet
+     * @param $params
+     * @param $activeItems
+     * @param $granularity
+     * @param $results
+     */
     private function createFacets($facet, $params, $activeItems, $granularity, &$results) {
         switch ($granularity) {
             case 'year':
@@ -212,31 +233,10 @@ class DateItemGranularProcessor extends ProcessorPluginBase implements BuildProc
     }
 
     /**
-     * Human readable array of granularity options.
-     *
-     * TODO - Remove if everything still works before commit.
-     *
-     * @return array
-     *   An array of granularity options.
-     */
-    /*private function granularityOptions() {
-        return [
-            SearchApiDateGranular::FACETAPI_DATE_YEAR => $this->t('Year'),
-            SearchApiDateGranular::FACETAPI_DATE_MONTH => $this->t('Month'),
-            SearchApiDateGranular::FACETAPI_DATE_DAY => $this->t('Day'),
-            SearchApiDateGranular::FACETAPI_DATE_HOUR => $this->t('Hour'),
-            SearchApiDateGranular::FACETAPI_DATE_MINUTE => $this->t('Minute'),
-            SearchApiDateGranular::FACETAPI_DATE_SECOND => $this->t('Second'),
-        ];
-    }*/
-
-    /**
      * {@inheritdoc}
      */
     public function buildConfigurationForm(array $form, FormStateInterface $form_state, FacetInterface $facet) {
-        $this->getConfiguration();
-        $build = [];
-        return $build;
+        return [];
     }
 
     /**
